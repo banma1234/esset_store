@@ -1,156 +1,116 @@
 <template>
-  <v-container class="py-8" style="max-width: 880px;">
-    <v-card>
-      <!-- 헤더 -->
-      <v-card-title class="justify-space-between">
-        <div class="text-h6">3D 모델 업로드</div>
-        <nuxt-link to="/">← 홈</nuxt-link>
-      </v-card-title>
-
-      <!-- 본문 -->
-      <v-card-text>
-        <v-alert type="info" dense class="mb-4">
-          지원 확장자: <code>.glb</code>, <code>.gltf</code>, <code>.stl</code>.
-          단일 파일 업로드는 <strong>.glb</strong> 권장.
-        </v-alert>
-
-        <v-form ref="form" v-model="isValid" lazy-validation>
-          <!-- 표시 이름 -->
-          <v-text-field label="표시 이름" v-model="form.name" :rules="[(v) => !!v || '이름은 필수입니다']" outlined dense />
+  <v-container class="py-6" fluid>
+    <v-row justify="center">
+      <v-col cols="12" md="6">
+        <v-card class="pa-6">
+          <div class="text-subtitle-1 mb-3">3D 모델 업로드 (.glb, .gltf, .stl)</div>
 
           <!-- 파일 선택 -->
-          <v-file-input label="3D 모델 파일" v-model="form.file" :rules="fileRules"
-            accept=".glb,.gltf,.stl,model/gltf-binary,model/gltf+json,model/stl" show-size truncate-length="64" outlined
-            dense prepend-icon="mdi-file-upload" @change="onFileChange" />
+          <input ref="fileInput" type="file" accept=".glb,.gltf,.stl,model/*" @change="onPick" />
 
-          <!-- 감지된 확장자/크기 -->
-          <div class="mt-2 grey--text text--darken-1">
-            감지된 형식: <strong>{{ form.ext || '-' }}</strong>
-            <span v-if="form.file"> • {{ formatBytes(form.file.size) }}</span>
-          </div>
-
-          <!-- 액션 -->
-          <div class="mt-6 d-flex align-center">
-            <v-btn color="primary" :disabled="!isValid || !form.file || state.submitting" @click="onSubmit">
+          <!-- 액션 버튼 -->
+          <div class="mt-4 d-flex">
+            <v-btn color="primary" :loading="state.loading" :disabled="!state.file || state.loading" @click="onUpload">
               업로드
             </v-btn>
-
-            <v-btn class="ml-3" text :disabled="state.submitting" @click="onReset">
-              리셋
-            </v-btn>
+            <v-btn class="ml-2" text :disabled="state.loading" @click="onReset">초기화</v-btn>
           </div>
 
-          <!-- 성공 -->
-          <v-alert v-if="state.result" type="success" class="mt-6" border="left">
-            업로드 완료: <strong>{{ state.result.filename }}</strong>
-            ({{ formatBytes(state.result.size) }})
-            <div class="mt-2">
-              <nuxt-link :to="`/assets/${state.result.id}`">모델 보기로 이동</nuxt-link>
-            </div>
-          </v-alert>
-
-          <!-- 에러 -->
-          <v-alert v-if="state.error" type="error" class="mt-6" border="left">
+          <!-- 메시지 -->
+          <v-alert v-if="state.error" type="error" dense outlined class="mt-4">
             {{ state.error }}
           </v-alert>
-        </v-form>
-      </v-card-text>
-    </v-card>
+
+          <v-alert v-if="state.done" type="success" dense outlined class="mt-4">
+            업로드 완료 — {{ state.meta?.fileName }}
+            ({{ (state.meta?.sizeBytes / 1024 / 1024).toFixed(2) }} MB)
+          </v-alert>
+
+          <!-- 업로드 요약(옵션) -->
+          <div v-if="state.meta" class="grey--text text--darken-1 mt-2">
+            확장자: {{ state.meta.extension }}
+            <template v-if="state.meta.version"> / 버전: {{ state.meta.version }}</template>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
   </v-container>
 </template>
 
 <script>
-// 표시용 유틸
-import { formatBytes, getExt } from '@/utils/assets/getMetaData'
-// 서비스(검증은 서비스에서 POLICY로 수행)
-import { uploadModelWithAutoMeta, DEFAULT_POLICY } from '@/utils/assets/uploadFile'
+import { upload3DModel, DEFAULT_POLICY } from '@/utils/assets/uploadFile'
 
 // ✅ 이 페이지의 POLICY (페이지마다 다르게 정의 가능)
-const POLICY = {
-  ...DEFAULT_POLICY,
-  // 필요 시 오버라이드:
-  // allowedExts: ['glb', 'gltf'],          // 예: 이 페이지는 stl 금지
-  // maxSizeBytes: 300 * 1024 * 1024        // 예: 관리자 페이지는 300MB 허용
-}
+const POLICY = { ...DEFAULT_POLICY, }
 
 export default {
   data() {
-
     return {
-      isValid: false,
-      form: { name: '', file: null, ext: '' },
       state: {
-        submitting: false,
-        result: null,
+        file: null,
+        meta: null,
+        loading: false,
+        done: false,
         error: ''
       }
     }
   },
 
-  computed: {
-    // UX를 위한 1차 뷰 검증(서비스 검증과 중복이지만 즉시 피드백 목적)
-    fileRules() {
-      const maxMB = Math.round(POLICY.maxSizeBytes / 1024 / 1024)
-
-      return [
-        v => !!v || '파일은 필수입니다',
-        v => !v || POLICY.allowedExts.includes(this.getExt(v.name)) ||
-          `허용되지 않는 확장자입니다 (${POLICY.allowedExts.map(x => '.' + x).join(', ')})`,
-        v => !v || v.size <= POLICY.maxSizeBytes || `파일 용량이 너무 큽니다 (≤ ${maxMB}MB)`,
-      ]
-    }
-  },
-
   methods: {
-    // ----- 표시 유틸 -----
-    formatBytes,
-    getExt(name = '') {
-      const m = name.toLowerCase().match(/\.([a-z0-9]+)$/);
-      return m ? m[1] : ''
+    /**
+     * @function onPick
+     * @description 파일 선택 시 상태 초기화 및 선택 파일 보관
+     * @param {Event} e - input change 이벤트
+     */
+    onPick(e) {
+      this.state.error = ''
+      this.state.done = false
+      const f = e.target.files && e.target.files[0]
+      this.state.file = f || null
+      // 버튼은 v-bind로 자동 활성/비활성 처리됨
     },
 
-    // ----- 이벤트 -----
-    onFileChange(file) {
+    /**
+     * @function onUpload
+     * @description 업로드 버튼 클릭 시 presign → PUT 업로드 실행
+     */
+    async onUpload() {
+      if (!this.state.file || this.state.loading) return
       this.state.error = ''
-      this.state.result = null
-      this.form.ext = file ? this.getExt(file.name) : ''
-    },
+      this.state.done = false
+      this.state.meta = null
+      this.state.loading = true
 
-    onReset() {
-      this.$refs.form.reset()
-      this.form.ext = ''
-      this.state.submitting = false
-      this.state.result = null
-      this.state.error = ''
-    },
-
-    // ----- 제출: POLICY만 넘기면 서비스가 validate+메타추출+업로드 -----
-    async onSubmit() {
-      this.state.error = ''
-      this.state.result = null
-
-      const ok = await this.$refs.form.validate()
-      if (!ok || !this.form.file) return
-
-      const success = await this.$err.guard(async () => {
-        this.state.submitting = true
-
-        const json = await uploadModelWithAutoMeta(this.$api, {
-          file: this.form.file,
-          displayName: this.form.name,
-          policy: POLICY       // ← 핵심: 페이지 정책만 전달
+      const ok = await this.$err.guard(async () => {
+        const { meta } = await upload3DModel({
+          file: this.state.file,
+          api: this.$api,
+          policy: POLICY
         })
-
-        this.state.result = json
-        this.state.submitting = false
+        this.state.meta = meta
+        this.state.done = true
 
         return true
-      }, { context: { where: 'UploadPage.onSubmit', filename: this.form.file?.name } })
+      }, { context: { where: 'UploadPage.onUpload' } })
 
-      if (!success) {
-        this.state.submitting = false
-        this.state.error = '업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+      if (!ok) {
+        this.state.error = '업로드 중 오류가 발생했습니다.'
       }
+
+      this.state.loading = false
+    },
+
+    /**
+     * @function onReset
+     * @description 화면 상태 초기화
+     */
+    onReset() {
+      this.state.file = null
+      this.state.meta = null
+      this.state.error = ''
+      this.state.done = false
+      // input 값을 지워 다음에 같은 파일도 다시 선택 가능
+      if (this.$refs.fileInput) this.$refs.fileInput.value = ''
     }
   }
 }
