@@ -1,4 +1,5 @@
 const express = require('express');
+const { asyncHandler } = require('../utils/asyncHandler');
 const { validateCreate } = require('../middlewares/validateCommonCode');
 const { saveCommonCode, getAllCommonCodes, getCommonCodeByCode } = require('../services/commonCode.service');
 
@@ -62,6 +63,6 @@ async function commonCodeHandler(req, res, next) {
  * @description
  * - POST만 validateCreate 적용
  */
-router.all('/api/v1/commonCode', conditionalValidator('POST', validateCreate), commonCodeHandler);
+router.all('/api/v1/commonCode', conditionalValidator('POST', validateCreate), asyncHandler(commonCodeHandler));
 
 module.exports = router;

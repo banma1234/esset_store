@@ -4,6 +4,13 @@ const morgan = require('morgan');
 const { mongoHealth } = require('./config/mongo');
 
 const commonCodeRoutes = require('./routes/commonCode.routes');
+const dbRoutes = require('./routes/db.routes');
+const logRoutes = require('./routes/logs.routes');
+
+const { logger } = require('./utils/logers');
+const { requestLogger } = require('./middlewares/requestLogger');
+const { requestContext } = require('./middlewares/requestContext');
+const { errorHandler } = require('./middlewares/errorHandler');
 
 const app = express();
 app.use(cors());
@@ -21,10 +28,20 @@ app.get('/api/v1/test', (req, res) => {
 });
 
 // db ping
-const dbRoutes = require('./routes/db.routes');
+
 app.use('/api/v1/db', dbRoutes);
 app.use(commonCodeRoutes);
+app.use(logRoutes);
+app.use(requestContext());
+app.use(requestLogger());
+app.use(errorHandler);
 
+// 서버 기동 시 로그 예시
+process.nextTick(() => {
+  /** @type {string} */
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  logger.info(`서버 시작 - NODE_ENV=${nodeEnv}`, { scope: 'bootstrap' });
+});
 // app.use(errorHandler); // 마지막에
 
 module.exports = app;
