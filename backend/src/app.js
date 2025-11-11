@@ -4,9 +4,12 @@ const morgan = require('morgan');
 const { mongoHealth } = require('./config/mongo');
 
 const commonCodeRoutes = require('./routes/commonCode.routes');
-const storageRoutes = require('./routes/storage.routes');
+const presignedRoutes = require('./routes/presigned.routes');
+const commitRoutes = require('./routes/commit.routes');
 const dbRoutes = require('./routes/db.routes');
 const logRoutes = require('./routes/logs.routes');
+
+const testRoutes = require('./routes/test.routes');
 
 const { logger } = require('./utils/logers');
 const { requestLogger } = require('./middlewares/requestLogger');
@@ -28,15 +31,16 @@ app.get('/api/v1/test', (req, res) => {
   res.json({ message: 'test successful' });
 });
 
-// db ping
-
 app.use('/api/v1/db', dbRoutes);
 app.use(commonCodeRoutes);
-app.use(storageRoutes);
+app.use(presignedRoutes);
+app.use(commitRoutes);
 app.use(logRoutes);
 app.use(requestContext());
 app.use(requestLogger());
 app.use(errorHandler);
+
+app.use(testRoutes);
 
 // 서버 기동 시 로그 예시
 process.nextTick(() => {
