@@ -31,13 +31,11 @@ export function extractMeta(file) {
   const extension = dot > -1 ? fileName.slice(dot + 1).toLowerCase() : "";
   const sizeBytes = typeof file.size === "number" ? file.size : 0;
   const contentType = file.type || "application/octet-stream";
-
-  // (가능하면) 파일명에서 버전 추정: name_v12, name-v1.2, name_v1_2 등 흔한 패턴만
   const base = dot > -1 ? fileName.slice(0, dot) : fileName;
   const verMatch =
     base.match(/[_\-\.]v(\d+(?:[\._]\d+)*)$/i) /* _v1, -v1.2, .v2_0 등 */ ||
     base.match(/[_\-\.](\d{8})$/); /* 뒤에 날짜형(예: _20250101) */
-  const version = verMatch ? "v." + verMatch[1].replace(/_/g, ".") + " " : "";
+  const version = verMatch ? verMatch[1].replace(/_/g, ".") : "1.0.0 ";
 
   return { fileName, extension, sizeBytes, version, contentType };
 }
@@ -49,11 +47,16 @@ export function extractMeta(file) {
  * @throws {Error} 검증 실패 시 에러
  */
 export function validateByPolicy(meta, policy) {
-  if (!policy) return;
+  if (!policy) {
+    return;
+  }
+
   if (policy.allowExt && policy.allowExt.length) {
     const ok = policy.allowExt.includes(meta.extension);
+
     if (!ok) throw new Error(`허용되지 않은 확장자입니다: .${meta.extension}`);
   }
+
   if (typeof policy.maxSizeBytes === "number") {
     if (meta.sizeBytes > policy.maxSizeBytes) {
       throw new Error(
@@ -71,7 +74,7 @@ export function validateByPolicy(meta, policy) {
  * @returns {{ url: string, headers?: Record<string,string>, key?: string }}
  */
 export async function requestPresign(api, meta, key) {
-  // 서버가 원하는 스키마에 맞춰 전달(예시)
+  // 서버가 원하는 스키마에 맞춰 전달)
   const res = await api.post("/storage/presign", {
     fileName: meta.fileName,
     contentType: meta.contentType,
@@ -80,10 +83,15 @@ export async function requestPresign(api, meta, key) {
     version: meta.version,
     key: key,
   });
+
   // 기대 응답 예시: { url, headers?, key? }
-  if (!res || !res.url)
+  if (!res || !res.data.url) {
     throw new Error("presigned URL 응답이 올바르지 않습니다.");
-  return { url: res.url, headers: res.headers || {}, key: res.key };
+  }
+
+  const { url, headers } = res.data;
+
+  return { url: url, headers: headers || {} };
 }
 
 /**
@@ -93,7 +101,7 @@ export async function requestPresign(api, meta, key) {
  * @param {Record<string,string>=} headers
  */
 export async function uploadViaPresignedPut(url, file, headers = {}) {
-  const resp = await fetch(url, {
+  const res = await fetch(url, {
     method: "PUT",
     headers: {
       "Content-Type": file.type || "application/octet-stream",
@@ -101,21 +109,21 @@ export async function uploadViaPresignedPut(url, file, headers = {}) {
     },
     body: file,
   });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`업로드 실패(${resp.status}) ${text && "- " + text}`);
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`업로드 실패(${res.status}) ${text && "- " + text}`);
   }
 }
 
 /**
  * 3D 모델 업로드 전체 파이프라인
  * 1) 메타 추출 → 2) 정책검증(옵션) → 3) presign 요청 → 4) presigned PUT 업로드
- *
  * @param {Object} params
  * @param {File} params.file 업로드할 파일
  * @param {$api} params.api 전역 API 헬퍼(this.$api)
  * @param {UploadPolicy=} params.policy 유효성 검사 정책(옵션)
- * @returns {Promise<{ meta: FileMeta, presign: any, result: { ok: true, key?: string } }>}
+ * @returns {Promise<{ meta: FileMeta, presign: any, result: { ok: true } }>}
  */
 export async function upload3DModel({ file, api, policy }) {
   if (!file) throw new Error("업로드할 파일이 없습니다.");
@@ -124,13 +132,13 @@ export async function upload3DModel({ file, api, policy }) {
   const meta = extractMeta(file);
   validateByPolicy(meta, policy);
 
-  const key = `assets/staging/${meta.fileName}/${meta.version}${meta.fileName}`;
+  const key = `assets/staging/${meta.fileName}/${meta.version}/${meta.fileName}`;
 
-  await requestPresign(api, meta, key).then((res) => {
-    const { url, headers } = res.data;
+  const presign = await requestPresign(api, meta, key).then((res) => {
+    const { url, headers } = res;
 
-    uploadViaPresignedPut(url, file, headers);
+    uploadViaPresignedPut(url, headers);
   });
 
-  return { meta, presign, result: { ok: true, key: presign.key } };
+  return { meta, presign, result: { ok: true } };
 }
