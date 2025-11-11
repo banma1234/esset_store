@@ -35,7 +35,7 @@ export function extractMeta(file) {
   const verMatch =
     base.match(/[_\-\.]v(\d+(?:[\._]\d+)*)$/i) /* _v1, -v1.2, .v2_0 등 */ ||
     base.match(/[_\-\.](\d{8})$/); /* 뒤에 날짜형(예: _20250101) */
-  const version = verMatch ? verMatch[1].replace(/_/g, ".") : "1.0.0 ";
+  const version = verMatch ? verMatch[1].replace(/_/g, ".") : "1.0.0";
 
   return { fileName, extension, sizeBytes, version, contentType };
 }
@@ -73,7 +73,7 @@ export function validateByPolicy(meta, policy) {
  * @param {FileMeta} meta
  * @returns {{ url: string, headers?: Record<string,string>, key?: string }}
  */
-export async function requestPresign(api, meta, key) {
+async function requestPresign(api, meta, key) {
   // 서버가 원하는 스키마에 맞춰 전달)
   const res = await api.post("/storage/presign", {
     fileName: meta.fileName,
@@ -100,7 +100,7 @@ export async function requestPresign(api, meta, key) {
  * @param {File} file
  * @param {Record<string,string>=} headers
  */
-export async function uploadViaPresignedPut(url, file, headers = {}) {
+async function uploadViaPresignedPut(url, file, headers = {}) {
   const res = await fetch(url, {
     method: "PUT",
     headers: {
@@ -113,6 +113,21 @@ export async function uploadViaPresignedPut(url, file, headers = {}) {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`업로드 실패(${res.status}) ${text && "- " + text}`);
+  }
+}
+
+async function requestCommit(api, key, meta) {
+  try {
+    const res = api.post("/assets/commit", {
+      fileName: meta.fileName,
+      sizeBytes: meta.sizeBytes,
+      version: meta.version,
+      key: key,
+    });
+
+    return res;
+  } catch (err) {
+    throw new Error(err);
   }
 }
 
@@ -134,11 +149,9 @@ export async function upload3DModel({ file, api, policy }) {
 
   const key = `assets/staging/${meta.fileName}/${meta.version}/${meta.fileName}`;
 
-  const presign = await requestPresign(api, meta, key).then((res) => {
-    const { url, headers } = res;
-
-    uploadViaPresignedPut(url, headers);
-  });
+  const presign = await requestPresign(api, meta, key);
+  await uploadViaPresignedPut(presign.url, file, presign.headers);
+  await requestCommit(api, key, meta);
 
   return { meta, presign, result: { ok: true } };
 }
