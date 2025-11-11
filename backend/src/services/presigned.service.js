@@ -38,6 +38,10 @@ async function issuePresignedPut({ key, contentType, expiresSec }) {
   ensureBucket();
   const expiresIn = clampExpires(expiresSec);
 
+  console.log('========================');
+  console.log(key);
+  console.log('========================');
+
   const cmd = new PutObjectCommand({
     Bucket: S3_BUCKET,
     Key: key,
