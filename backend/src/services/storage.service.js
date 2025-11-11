@@ -37,6 +37,7 @@ function ensureBucket() {
 async function issuePresignedPut({ key, contentType, expiresSec }) {
   ensureBucket();
   const expiresIn = clampExpires(expiresSec);
+
   const cmd = new PutObjectCommand({
     Bucket: S3_BUCKET,
     Key: key,
@@ -47,7 +48,7 @@ async function issuePresignedPut({ key, contentType, expiresSec }) {
   return {
     url,
     method: 'PUT',
-    headers: contentType ? { 'Content-Type': contentType } : {},
+    headers: { 'x-amz-checksum-crc32': 'AAAAAA==' },
   };
 }
 

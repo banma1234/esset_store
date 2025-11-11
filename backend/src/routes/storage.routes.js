@@ -1,5 +1,5 @@
 const express = require('express');
-const { issuePresignedPut, issuePresignedGet } = require('../services/storage.service');
+const { issuePresignedPut, issuePresignedGet, applyBucketCors } = require('../services/storage.service');
 const { asyncHandler } = require('../utils/asyncHandler');
 
 const router = express.Router();
@@ -15,23 +15,18 @@ async function presignHandler(req, res, next) {
   /** @type {{ type?: string, contentType?: string, expiresSec?: number }} */
   const { key, contentType, expiresSec } = req.body;
 
-  console.log(contentType);
-  console.log(key);
-  console.log(req.body);
-  console.log('\n\n\n\n');
-
   try {
     if (req.method === 'GET') {
       const data = await issuePresignedGet({ key, expiresSec });
 
-      return res.json({ ok: true, data });
+      return res.status(200).json({ ok: true, data });
     }
 
     // 2) 분기 처리
     if (req.method === 'POST') {
       const data = await issuePresignedPut({ key, contentType, expiresSec });
 
-      return res.json({ ok: true, data });
+      return res.status(201).json({ ok: true, data: data });
     }
 
     // 허용되지 않은 메서드
