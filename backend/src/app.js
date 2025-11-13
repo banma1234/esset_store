@@ -8,7 +8,8 @@ const presignedRoutes = require('./routes/presigned.routes');
 const commitRoutes = require('./routes/commit.routes');
 const dbRoutes = require('./routes/db.routes');
 const logRoutes = require('./routes/logs.routes');
-const testRoutes = require('./routes/test.routes');
+
+const test2Routes = require('./routes/test2.routes');
 
 const { logger } = require('./utils/logers');
 const { requestLogger } = require('./middlewares/requestLogger');
@@ -41,7 +42,7 @@ app.use(requestContext());
 app.use(requestLogger());
 app.use(errorHandler);
 
-app.use(testRoutes);
+app.use(test2Routes);
 
 // 서버 기동 시 로그 예시
 process.nextTick(() => {
