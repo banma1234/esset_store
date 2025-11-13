@@ -58,7 +58,7 @@ async function enqueueThumbnailJob(body) {
 
   const job = await assetPipelineQueue.add(
     'generate-thumbnail',
-    { key, thumbKey, width, height },
+    { key, thumbKey, width, height, version },
     {
       jobId,
       removeOnComplete: 1000,

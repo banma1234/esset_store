@@ -2,6 +2,9 @@ const { Worker } = require('bullmq');
 const { queueOptions, QUEUE_NAME } = require('../queues/asset.queue');
 const { getSafeObjectBuffer, putThumbnail } = require('../services/assets/assets.service');
 const { renderGltfToJpeg } = require('../services/assets/thumbnail.service');
+const { extractGltfMetadata } = require('../services/assets/unpackageAssets.service');
+const { injectMetadata } = require('../services/assets/injectMetaData.service');
+
 const { AppError } = require('../errors/appError');
 
 /**
@@ -10,6 +13,7 @@ const { AppError } = require('../errors/appError');
  * @property {string} thumbKey 결과 썸네일 업로드 키
  * @property {number} width    썸네일 너비
  * @property {number} height   썸네일 높이
+ * @property {string} version  버전
  */
 
 function assertJobData(data) {
@@ -37,24 +41,25 @@ const worker = new Worker(
     const gltfBuffer = await getSafeObjectBuffer(data.key);
     const gltfStr = gltfBuffer.toString('utf8');
 
-    // 빠른 진단 로그
-    console.log('[thumb/guard] key=', data.key, 'len=', gltfStr.length, 'head=', gltfStr.slice(0, 60));
-
-    // 내용 검증: 최소 JSON 형태 보장
-    try {
-      const parsed = JSON.parse(gltfStr);
-      if (!parsed.asset || !parsed.scenes) {
-        throw new Error('GLTF core fields missing');
-      }
-    } catch (e) {
-      throw new Error(`INVALID_GLTF_FILE: Not a valid JSON glTF at ${data.key}. First bytes="${gltfStr.slice(0, 60)}"`);
-    }
-
     // 2) 썸네일 생성(서비스)
     const jpeg = await renderGltfToJpeg(gltfStr, { width: data.width, height: data.height });
-
     // 3) 업로드
     await putThumbnail(data.thumbKey, jpeg);
+
+    const updatedGltfStr = await injectMetadata({
+      gltfJsonStr: gltfStr,
+      thumbJpeg: jpeg,
+      version: data.version,
+      userData: {
+        rig: {},
+        links: {},
+      },
+    });
+
+    const finalMeta = await extractGltfMetadata(updatedGltfStr);
+    console.log('\n\n');
+    console.log(finalMeta);
+    console.log('\n\n');
 
     return {
       status: 'ok',
