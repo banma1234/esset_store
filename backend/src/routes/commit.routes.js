@@ -1,6 +1,8 @@
 const express = require('express');
-const { checkMetaCorrect } = require('../services/assets.service');
+const { checkMetaCorrect, promoteStagingToFinal } = require('../services/assets/assets.service');
+const { enqueueThumbnailJob } = require('../services/enque.service');
 const { asyncHandler } = require('../utils/asyncHandler');
+const { getSafeObjectBuffer } = require('../services/assets/assets.service');
 
 const router = express.Router();
 
@@ -13,9 +15,12 @@ const router = express.Router();
  */
 async function commitHandler(req, res, next) {
   try {
-    const data = await checkMetaCorrect(req.body);
+    await checkMetaCorrect(req.body);
+    await promoteStagingToFinal(req.body).then((res) => {
+      enqueueThumbnailJob(res);
+    });
 
-    return res.status(200).json({ ok: true, data });
+    return res.status(200).json({ ok: true });
   } catch (err) {
     next(err);
   }
