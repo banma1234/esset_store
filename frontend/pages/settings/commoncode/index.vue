@@ -88,7 +88,7 @@
 
 <script>
 // 트리 변환 유틸
-import { buildTree } from '@/utils/buildTree'
+import { buildTree, findTreeNodeById } from '@/utils/commonCodes/buildTree'
 import { formatDate } from '@/utils/formatDate';
 
 export default {
@@ -214,15 +214,7 @@ export default {
 
         /** 단순 탐색(필요 최소 기능) */
         findNodeById(id) {
-            // 트리가 그리 크지 않다고 가정하고 BFS로 탐색
-            const q = [...this.tree.items]
-            while (q.length) {
-                const cur = q.shift()
-                if (cur.id === id) return cur
-                if (cur.children && cur.children.length) q.push(...cur.children)
-            }
-
-            return null
+            return findTreeNodeById(this.tree.items, id);
         },
 
         /** 상세 조회: GET /api/v1/commoncode?code=TARGET */

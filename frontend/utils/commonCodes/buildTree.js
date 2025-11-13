@@ -1,10 +1,3 @@
-// utils/buildTree.js
-// 공통코드(flat list) → v-treeview 용 트리 구조로 변환
-// 요구사항:
-// - parentCode는 "부모의 code"를 가리킨다(null 가능)
-// - 루트 depth=0
-// - updatedAt 필드를 보존(우측 상세에서 사용)
-
 export function buildTree(rows = []) {
   const byId = new Map();
   const roots = [];
