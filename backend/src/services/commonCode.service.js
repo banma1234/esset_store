@@ -1,4 +1,5 @@
 const CommonCode = require('../models/CommonCode');
+const { AppError } = require('../errors/appError');
 
 /**
  * @function loadParentFor
@@ -36,23 +37,19 @@ async function saveCommonCode(payload) {
 
   const parent = await loadParentFor(normalizedParent);
   if (normalizedParent && !parent) {
-    const err = new Error('parentCode not found or deleted');
-    err.status = 400;
-    throw err;
+    throw new AppError('부모 코드를 찾을 수 없습니다.', 400, 'PARENT_REQUIRED');
   }
   const depth = computeDepth(parent);
 
   try {
     const doc = await CommonCode.create({ code, name, parentCode: normalizedParent, depth });
+
     return doc.toObject();
   } catch (e) {
     if (e && e.code === 11000) {
-      const err = new Error('code already exists');
-      err.status = 409;
-      throw err;
+      throw new AppError('해당 코드는 이미 존재합니다.', 409, 'CODE_ARLEADY_EXISTS');
     }
-    e.status = 500;
-    throw e;
+    throw new AppError('알 수 없는 에러', 500, 'UNKNOWN_ERROR');
   }
 }
 
@@ -66,13 +63,33 @@ async function getAllCommonCodes() {
 }
 
 /**
- * @function getCommonCodeByCode
- * @description 특정 code에 해당하는 공통코드를 조회한다. (GET, code 지정)
- * @param {string} code 조회할 code
- * @returns {Promise<object|null>} 문서(lean) 또는 null
+ * @function getAllCommonCodes
+ * @description CommonCode 컬렉션에서 삭제되지 않은 공통코드를 모두 조회한 뒤
+ * FIL* → filters, CAT* → categories 로 분류해서 반환한다.
+ * @returns {Promise<{filters: object[], categories: object[]}>}
  */
-async function getCommonCodeByCode(code) {
-  return CommonCode.findOne({ code, deletedAt: null }).lean();
+async function getAllCommonCodes() {
+  const codes = await CommonCode
+    .find({ deletedAt: null })
+    .sort({ depth: 1, code: 1 })
+    .lean();
+
+  /** @type {object[]} */
+  const filters = [];
+  /** @type {object[]} */
+  const categories = [];
+
+  for (const code of codes) {
+    const value = code.code || '';
+
+    if (value.startsWith('FIL')) {
+      filters.push(code);
+    } else if (value.startsWith('CAT')) {
+      categories.push(code);
+    }
+  }
+
+  return { filters, categories };
 }
 
 module.exports = {

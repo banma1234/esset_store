@@ -31,11 +31,10 @@ async function commonCodeHandler(req, res, next) {
 
       if (code) {
         const target = await getCommonCodeByCode(code);
-
         if (!target) {
           return res.status(404).json({ ok: false, message: 'commonCode not target' });
         }
-
+        
         return res.status(200).json({ ok: true, data: target });
       }
       const items = await getAllCommonCodes();
