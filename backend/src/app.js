@@ -8,13 +8,14 @@ const presignedRoutes = require('./routes/presigned.routes');
 const commitRoutes = require('./routes/commit.routes');
 const dbRoutes = require('./routes/db.routes');
 const logRoutes = require('./routes/logs.routes');
-
 const testRoutes = require('./routes/test.routes');
 
 const { logger } = require('./utils/logers');
 const { requestLogger } = require('./middlewares/requestLogger');
 const { requestContext } = require('./middlewares/requestContext');
 const { errorHandler } = require('./middlewares/errorHandler');
+
+require('./worker/asset.worker');
 
 const app = express();
 app.use(cors());
