@@ -1,7 +1,7 @@
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { createS3Client } = require('../utils/s3');
-const { AppError } = require('../errors/appError');
+const { createS3Client } = require('../../utils/s3');
+const { AppError } = require('../../errors/appError');
 
 const s3 = createS3Client();
 const S3_BUCKET = process.env.S3_BUCKET;
@@ -37,11 +37,6 @@ function ensureBucket() {
 async function issuePresignedPut({ key, contentType, expiresSec }) {
   ensureBucket();
   const expiresIn = clampExpires(expiresSec);
-
-  console.log('========================');
-  console.log(key);
-  console.log('========================');
-
   const cmd = new PutObjectCommand({
     Bucket: S3_BUCKET,
     Key: key,

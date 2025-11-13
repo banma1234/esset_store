@@ -1,5 +1,5 @@
 const express = require('express');
-const { issuePresignedPut, issuePresignedGet, applyBucketCors } = require('../services/presigned.service');
+const { issuePresignedPut, issuePresignedGet } = require('../services/assets/presigned.service');
 const { asyncHandler } = require('../utils/asyncHandler');
 
 const router = express.Router();
