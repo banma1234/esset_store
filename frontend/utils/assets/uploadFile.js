@@ -1,6 +1,6 @@
 /** 기본 POLICY (페이지에서 오버라이드 가능) */
 export const DEFAULT_POLICY = {
-  allowedExts: ["glb", "gltf", "stl"],
+  allowedExt: ["gltf"],
   maxSizeBytes: 200 * 1024 * 1024, // 200MB
 };
 
@@ -26,12 +26,12 @@ export const DEFAULT_POLICY = {
  * @returns {FileMeta}
  */
 export function extractMeta(file) {
-  const fileName = file.name || "unnamed";
-  const dot = fileName.lastIndexOf(".");
-  const extension = dot > -1 ? fileName.slice(dot + 1).toLowerCase() : "";
+  const dot = file.name.lastIndexOf(".");
+  const fileName = file.name.slice(0, dot) || "unnamed";
+  const extension = dot > -1 ? file.name.slice(dot + 1).toLowerCase() : "";
   const sizeBytes = typeof file.size === "number" ? file.size : 0;
   const contentType = file.type || "application/octet-stream";
-  const base = dot > -1 ? fileName.slice(0, dot) : fileName;
+  const base = dot > -1 ? file.name.slice(0, dot) : fileName;
   const verMatch =
     base.match(/[_\-\.]v(\d+(?:[\._]\d+)*)$/i) /* _v1, -v1.2, .v2_0 등 */ ||
     base.match(/[_\-\.](\d{8})$/); /* 뒤에 날짜형(예: _20250101) */
@@ -147,7 +147,7 @@ export async function upload3DModel({ file, api, policy }) {
   const meta = extractMeta(file);
   validateByPolicy(meta, policy);
 
-  const key = `assets/staging/${meta.fileName}/${meta.version}/${meta.fileName}`;
+  const key = `assets/staging/${meta.fileName}/${meta.version}/${meta.fileName}.${meta.extension}`;
 
   const presign = await requestPresign(api, meta, key);
   await uploadViaPresignedPut(presign.url, file, presign.headers);
