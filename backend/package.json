@@ -29,7 +29,9 @@
     "joi": "^18.0.1",
     "mongoose": "^8.19.3",
     "morgan": "^1.10.1",
+    "occt-import-js": "^0.0.23",
     "puppeteer": "^24.29.1",
+    "three-stdlib": "^2.36.1",
     "winston": "^3.18.3",
     "winston-daily-rotate-file": "^5.0.0"
   }
