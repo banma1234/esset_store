@@ -18,7 +18,7 @@ async function extractGltfMetadata(gltfJsonStr) {
   }
   const root = doc.getRoot();
 
-  // ✅ 메서드 호출 방어 유틸
+  // 메서드 호출 방어 유틸
   const safeList = (obj, method) => (obj && typeof obj[method] === 'function' ? obj[method]() : []);
 
   // asset
@@ -29,7 +29,7 @@ async function extractGltfMetadata(gltfJsonStr) {
     copyright: asset.copyright || null,
   };
 
-  // ✅ list* 호출은 모두 safeList로 감싼다
+  // list* 호출은 모두 safeList로 감싼다
   const scenes = safeList(root, 'listScenes');
   const nodes = safeList(root, 'listNodes');
   const meshes = safeList(root, 'listMeshes');
@@ -53,7 +53,7 @@ async function extractGltfMetadata(gltfJsonStr) {
     0,
   );
 
-  // ✅ 이미지 MIME 요약: JSON 기준(URI가 data:면 파싱)
+  // 이미지 MIME 요약: JSON 기준(URI가 data:면 파싱)
   const mimeTypes = {};
   for (const img of imagesJson) {
     let mt = img.mimeType;

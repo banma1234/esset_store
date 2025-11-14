@@ -1,5 +1,5 @@
 // /utils/commonCodeTree.js
-import { buildTree } from './buildTree'
+import { buildTree } from "./buildTree";
 
 /**
  * @typedef {Object} CommonCodeRow
@@ -8,7 +8,7 @@ import { buildTree } from './buildTree'
  * @property {string} name        - 공통코드 이름
  * @property {number} depth       - 트리 depth
  * @property {boolean} [isActive] - 사용 여부
- * @property {string|null} [parentCode] - 부모 코드
+ * @property {string|null} [parentId] - 부모 코드
  * @property {string|null} [updatedAt]   - 수정일
  */
 
@@ -19,7 +19,7 @@ import { buildTree } from './buildTree'
  * @property {string} name
  * @property {number} depth
  * @property {boolean} isActive
- * @property {string|null} parentCode
+ * @property {string|null} parentId
  * @property {Array<TreeNode>} children
  */
 
@@ -37,7 +37,7 @@ import { buildTree } from './buildTree'
  * @returns {Array<TreeNode>} v-treeview용 루트 노드 배열
  */
 export function buildCategoryTree(rows = []) {
-  return buildTree(rows)
+  return buildTree(rows);
 }
 
 /**
@@ -48,17 +48,17 @@ export function buildCategoryTree(rows = []) {
  * @returns {TreeNode|null} 찾은 노드 또는 null
  */
 export function findTreeNodeById(items = [], id) {
-  const queue = [...items]
+  const queue = [...items];
 
   while (queue.length) {
-    const cur = queue.shift()
-    if (cur.id === id) return cur
+    const cur = queue.shift();
+    if (cur.id === id) return cur;
     if (cur.children && cur.children.length) {
-      queue.push(...cur.children)
+      queue.push(...cur.children);
     }
   }
 
-  return null
+  return null;
 }
 
 /**
@@ -70,13 +70,13 @@ export function findTreeNodeById(items = [], id) {
  * @returns {Array<FilterRoot>} 필터 루트 목록
  */
 export function buildFilterRoots(rows = []) {
-  const roots = buildTree(rows)
+  const roots = buildTree(rows);
 
   return roots.map((root) => ({
     code: root.code,
     name: root.name,
-    options: flattenChildren(root)
-  }))
+    options: flattenChildren(root),
+  }));
 }
 
 /**
@@ -86,18 +86,18 @@ export function buildFilterRoots(rows = []) {
  * @returns {Array<TreeNode>} 하위 노드 평탄화 리스트
  */
 export function flattenChildren(root) {
-  if (!root || !Array.isArray(root.children)) return []
+  if (!root || !Array.isArray(root.children)) return [];
 
-  const out = []
-  const queue = [...root.children]
+  const out = [];
+  const queue = [...root.children];
 
   while (queue.length) {
-    const cur = queue.shift()
-    out.push(cur)
+    const cur = queue.shift();
+    out.push(cur);
     if (cur.children && cur.children.length) {
-      queue.push(...cur.children)
+      queue.push(...cur.children);
     }
   }
 
-  return out
+  return out;
 }

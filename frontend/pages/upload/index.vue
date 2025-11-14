@@ -6,60 +6,30 @@
           <div class="text-subtitle-1 mb-3">3D 모델 업로드 (.glb, .gltf, .stl)</div>
 
           <!-- 파일 선택 -->
-          <input
-            ref="fileInput"
-            type="file"
-            accept=".glb,.gltf,.stl,model/*"
-            @change="onPick"
-          />
+          <input ref="fileInput" type="file" accept=".glb,.gltf,.stl,model/*" @change="onPick" />
 
           <!-- 액션 버튼 -->
           <div class="mt-4 d-flex">
-            <v-btn
-              color="primary"
-              :loading="state.loading"
-              :disabled="!state.file || state.loading"
-              @click="onUpload"
-            >
+            <v-btn color="primary" :loading="state.loading" :disabled="!state.file || state.loading" @click="onUpload">
               업로드
             </v-btn>
-            <v-btn
-              class="ml-2"
-              text
-              :disabled="state.loading"
-              @click="onReset"
-            >
+            <v-btn class="ml-2" text :disabled="state.loading" @click="onReset">
               초기화
             </v-btn>
           </div>
 
           <!-- 메시지 -->
-          <v-alert
-            v-if="state.error"
-            type="error"
-            dense
-            outlined
-            class="mt-4"
-          >
+          <v-alert v-if="state.error" type="error" dense outlined class="mt-4">
             {{ state.error }}
           </v-alert>
 
-          <v-alert
-            v-if="state.done"
-            type="success"
-            dense
-            outlined
-            class="mt-4"
-          >
+          <v-alert v-if="state.done" type="success" dense outlined class="mt-4">
             업로드 완료 — {{ state.meta?.fileName }}
             ({{ (state.meta?.sizeBytes / 1024 / 1024).toFixed(2) }} MB)
           </v-alert>
 
           <!-- 업로드 요약(옵션) -->
-          <div
-            v-if="state.meta"
-            class="grey--text text--darken-1 mt-2"
-          >
+          <div v-if="state.meta" class="grey--text text--darken-1 mt-2">
             확장자: {{ state.meta.extension }}
             <template v-if="state.meta.version">
               / 버전: {{ state.meta.version }}
@@ -77,29 +47,13 @@
 
           <v-card outlined class="pa-3">
             <div style="max-height: 260px; overflow: auto;">
-              <v-alert
-                v-if="categoryTree.error"
-                type="error"
-                dense
-                outlined
-                class="mb-2"
-              >
+              <v-alert v-if="categoryTree.error" type="error" dense outlined class="mb-2">
                 {{ categoryTree.error }}
               </v-alert>
 
-              <v-treeview
-                v-else
-                :items="categoryTree.items"
-                :open.sync="categoryTree.open"
-                :active.sync="categoryTree.active"
-                item-key="id"
-                item-children="children"
-                activatable
-                open-on-click
-                dense
-                transition
-                @update:active="onCategoryActiveChange"
-              >
+              <v-treeview v-else :items="categoryTree.items" :open.sync="categoryTree.open"
+                :active.sync="categoryTree.active" item-key="id" item-children="children" activatable open-on-click
+                dense transition @update:active="onCategoryActiveChange">
                 <template #label="{ item }">
                   <span>
                     {{ item.name }}
@@ -121,34 +75,15 @@
             필터 선택
           </div>
 
-          <v-alert
-            v-if="filtersUi.error"
-            type="error"
-            dense
-            outlined
-            class="mb-2"
-          >
+          <v-alert v-if="filtersUi.error" type="error" dense outlined class="mb-2">
             {{ filtersUi.error }}
           </v-alert>
 
           <v-row>
-            <v-col
-              v-for="root in filtersUi.roots"
-              :key="root.code"
-              cols="12"
-              sm="6"
-            >
-              <v-select
-                :label="root.name"
-                :items="getFilterItems(root)"
-                item-text="text"
-                item-value="value"
-                :value="filtersUi.values[root.code] || null"
-                @change="onFilterChange(root, $event)"
-                outlined
-                dense
-                :menu-props="{ offsetY: true, nudgeBottom: 8 }"
-              />
+            <v-col v-for="root in filtersUi.roots" :key="root.code" cols="12" sm="6">
+              <v-select :label="root.name" :items="getFilterItems(root)" item-text="text" item-value="value"
+                :value="filtersUi.values[root.code] || null" @change="onFilterChange(root, $event)" outlined dense
+                :menu-props="{ offsetY: true, nudgeBottom: 8 }" />
             </v-col>
           </v-row>
 
@@ -156,10 +91,7 @@
           <!-- 테스트 버튼           -->
           <!-- ===================== -->
           <div class="mt-4">
-            <v-btn
-              color="secondary"
-              @click="onTestSelections"
-            >
+            <v-btn color="secondary" @click="onTestSelections">
               테스트
             </v-btn>
           </div>
@@ -171,7 +103,7 @@
 
 <script>
 import { upload3DModel, DEFAULT_POLICY } from '@/utils/assets/uploadFile'
-import { getCommonCodes } from '@/utils/commonCodes/getCommonCodes'
+import { getAllCommonCodes } from '../../utils/commonCodes/getCommonCodes'
 import {
   buildCategoryTree,
   buildFilterRoots,
@@ -232,8 +164,7 @@ export default {
   methods: {
     /**
      * @function loadCommonCodes
-     * @description 공통코드(filters, categories)를 조회하고
-     *              카테고리 트리/필터 셀렉트 상태를 초기화한다.
+     * @description 공통코드(filters, categories)를 조회하고 카테고리 트리/필터 셀렉트 상태를 초기화한다.
      */
     async loadCommonCodes() {
       this.categoryTree.error = ''
@@ -241,8 +172,8 @@ export default {
 
       const ok = await this.$err.guard(
         async () => {
-          const data = await getCommonCodes(this.$api)
-          this.commonCode = data || { filters: [], categories: [] }
+          const list = await this.$api.get('/commoncode');
+          this.commonCode = list.data || { filters: [], categories: [] }
 
           // 필요 시 디버그용으로만 사용 (선택 시마다 로그는 아님)
           // console.log('[UploadPage] commonCode:', this.commonCode)

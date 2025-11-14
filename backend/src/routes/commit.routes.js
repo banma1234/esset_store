@@ -2,7 +2,6 @@ const express = require('express');
 const { checkMetaCorrect, promoteStagingToFinal } = require('../services/assets/assets.service');
 const { enqueueThumbnailJob } = require('../services/enque.service');
 const { asyncHandler } = require('../utils/asyncHandler');
-const { getSafeObjectBuffer } = require('../services/assets/assets.service');
 
 const router = express.Router();
 

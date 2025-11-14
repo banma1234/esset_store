@@ -11,5 +11,5 @@
  * @returns {Promise<CommonCodeResponse>} 공통코드 응답 데이터
  */
 export async function getAllCommonCodes(api) {
-  return await api.get('/api/v1/commonCode')
+  return await api.get("/api/v1/commonCode");
 }

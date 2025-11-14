@@ -88,7 +88,8 @@
 
 <script>
 // 트리 변환 유틸
-import { buildTree, findTreeNodeById } from '@/utils/commonCodes/buildTree'
+import { buildTree } from '@/utils/commonCodes/buildTree'
+import { findTreeNodeById } from '@/utils/commonCodes/commonCodeTree'
 import { formatDate } from '@/utils/formatDate';
 
 export default {
@@ -143,13 +144,6 @@ export default {
         'detail.data.code'(val) {
             this.detail.codeParts = this.splitCode(val)
         },
-
-        // // 소분류가 바뀌면 전체 코드 재조합(대분류 + 소분류)
-        // 'detail.codeParts.minor'(val) {
-        //     const major = this.detail.codeParts.major || ''
-        //     const minor = (val || '').slice(0, 3)
-        //     this.detail.data.code = major + minor
-        // }
     },
 
     mounted() {
@@ -170,7 +164,9 @@ export default {
 
             const ok = await this.$err.guard(async () => {
                 const list = await this.$api.get('/commoncode')
-                this.state.raw = Array.isArray(list.data) ? list.data : []
+                const { filters, categories } = list.data;
+
+                this.state.raw = [...filters, ...categories]
                 this.tree.items = buildTree(this.state.raw)
 
                 return true
@@ -273,13 +269,13 @@ export default {
                 return
             }
 
-            const parentId = this.hasActive ? this.tree.active[0] : null
-            const major = this.hasActive ? this.detail.codeParts.major + '-' : this.detail.codeParts.major
+            const parentId = this.hasActive ? this.detail.codeParts.major : ''
+            const major = this.hasActive ? this.detail.codeParts.major + '-' : ''
             const minor = this.detail.codeParts.minor
             const fullCode = major + minor  // ← 저장 시점에만 합치기 (요구사항 3 반영)
 
             const payload = {
-                parentId,          // null이면 루트
+                parentId,
                 major,
                 minor,
                 code: fullCode,
@@ -287,10 +283,22 @@ export default {
                 isActive: this.detail.data.isActive
             }
 
-            // eslint-disable-next-line no-console
-            console.log('[SAVE]', payload)
+            const res = await this.$err.guard(async () => {
+                if (this.ui.createMode) {
+                    const res = await this.$api.post('/commoncode', payload);
+                    console.log(res.data);
+
+                    return res;
+                }
+                return await this.$api.put('/commoncode', payload);
+            }, { context: { where: 'AdminCommonCode.loadDetail', fullCode } })
+
+            if (!res.ok) {
+                this.detail.error = '공통코드 편집에 실패했습니다.'
+            }
 
             this.ui.createMode = false
+            this.reload();
             // 필요 시 여기서 폼 초기화/선택 해제/리로드 등 처리
         },
         // 🔹 취소(생성 취소 + 선택 해제 + 상세 초기화)

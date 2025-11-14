@@ -1,7 +1,11 @@
 const express = require('express');
 const { asyncHandler } = require('../utils/asyncHandler');
-const { validateCreate } = require('../middlewares/validateCommonCode');
-const { saveCommonCode, getAllCommonCodes, getCommonCodeByCode } = require('../services/commonCode.service');
+const {
+  saveCommonCode,
+  getAllCommonCodes,
+  getCommonCodeByCode,
+  updateCommonCode,
+} = require('../services/commonCode.service');
 
 const router = express.Router();
 
@@ -12,9 +16,6 @@ const router = express.Router();
  * @param {import('express').RequestHandler} validator 미들웨어
  * @returns {import('express').RequestHandler}
  */
-function conditionalValidator(method, validator) {
-  return (req, res, next) => (req.method === method ? validator(req, res, next) : next());
-}
 
 /**
  * @function commonCodeHandler
@@ -34,7 +35,7 @@ async function commonCodeHandler(req, res, next) {
         if (!target) {
           return res.status(404).json({ ok: false, message: 'commonCode not target' });
         }
-        
+
         return res.status(200).json({ ok: true, data: target });
       }
       const items = await getAllCommonCodes();
@@ -44,9 +45,17 @@ async function commonCodeHandler(req, res, next) {
 
     // POST: 생성
     if (req.method === 'POST') {
-      const created = await saveCommonCode(req.validatedBody);
+      await saveCommonCode(req.body);
 
-      return res.status(201).json({ ok: true, data: created });
+      return res.status(201).json({ ok: true });
+    }
+
+    // PUT : 수정
+    if (req.method === 'PUT') {
+      console.log(req.body);
+      await updateCommonCode(req.body);
+
+      return res.status(201).json({ ok: true });
     }
 
     // 허용되지 않은 메서드
@@ -62,6 +71,6 @@ async function commonCodeHandler(req, res, next) {
  * @description
  * - POST만 validateCreate 적용
  */
-router.all('/api/v1/commonCode', conditionalValidator('POST', validateCreate), asyncHandler(commonCodeHandler));
+router.all('/api/v1/commonCode', asyncHandler(commonCodeHandler));
 
 module.exports = router;

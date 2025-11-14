@@ -4,27 +4,27 @@ export function buildTree(rows = []) {
 
   // 1) 노드 사전 생성 (v-treeview 필수 필드 포함)
   rows.forEach((r) => {
-    byId.set(r.code, {
+    byId.set(r._id, {
       id: r._id,
       code: r.code,
       name: r.name,
       depth: r.depth,
       isActive: !!r.isActive,
       updatedAt: r.updatedAt || null,
-      parentCode: r.parentCode || null,
+      parentId: r.parentId || null,
       children: [],
     });
   });
 
   // 2) 부모-자식 연결
   rows.forEach((r) => {
-    const node = byId.get(r.code);
+    const node = byId.get(r._id);
 
     if (!node) {
       return;
     }
-    if (node.parentCode && byId.has(node.parentCode)) {
-      byId.get(node.parentCode).children.push(node);
+    if (node.parentId && byId.has(node.parentId)) {
+      byId.get(node.parentId).children.push(node);
     } else {
       roots.push(node);
     }

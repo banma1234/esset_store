@@ -1,15 +1,16 @@
 const CommonCode = require('../models/CommonCode');
 const { AppError } = require('../errors/appError');
+const { ObjectId } = require('mongodb');
 
 /**
  * @function loadParentFor
- * @description parentCode가 존재하면 부모 문서를 로드한다.
- * @param {string|null} parentCode 검증/계산 대상 부모 코드 문자열
+ * @description parentId 존재하면 부모 문서를 로드한다.
+ * @param {string|null} parentId 검증/계산 대상 부모 코드 문자열
  * @returns {Promise<object|null>} 부모 문서(lean) 또는 null
  */
-async function loadParentFor(parentCode) {
-  if (!parentCode) return null;
-  return CommonCode.findOne({ code: parentCode, deletedAt: null }).lean();
+async function loadParentFor(parentId) {
+  if (!parentId) return null;
+  return CommonCode.findOne({ _id: new ObjectId(parentId), deletedAt: null }).lean();
 }
 
 /**
@@ -27,22 +28,21 @@ function computeDepth(parent) {
 /**
  * @function saveCommonCode
  * @description 공통코드를 생성한다. (POST)
- * @param {{ code: string, name: string, parentCode?: (string|null) }} payload 생성할 코드 정보
+ * @param {{ code: string, name: string, parentId?: (string|null) }} payload 생성할 코드 정보
  * @returns {Promise<object>} 생성된 문서(POJO)
  * @throws {Error} 부모 없음/삭제(400), 코드 중복(409), 서버 오류(500)
  */
 async function saveCommonCode(payload) {
-  const { code, name, parentCode } = payload;
-  const normalizedParent = parentCode && String(parentCode).trim() !== '' ? parentCode : null;
+  const { code, name, parentId, isActive } = payload;
+  const parent = await loadParentFor(parentId);
+  let depth = 0;
 
-  const parent = await loadParentFor(normalizedParent);
-  if (normalizedParent && !parent) {
-    throw new AppError('부모 코드를 찾을 수 없습니다.', 400, 'PARENT_REQUIRED');
+  if (parentId && parent) {
+    depth = computeDepth(parent);
   }
-  const depth = computeDepth(parent);
 
   try {
-    const doc = await CommonCode.create({ code, name, parentCode: normalizedParent, depth });
+    const doc = await CommonCode.create({ code, name, parentId, depth, isActive });
 
     return doc.toObject();
   } catch (e) {
@@ -53,13 +53,20 @@ async function saveCommonCode(payload) {
   }
 }
 
+async function updateCommonCode(payload) {
+  const { code, name, isActive, parentId } = payload;
+
+  await CommonCode.updateOne({ _id: parentId }, { code, name, isActive });
+}
+
 /**
- * @function getAllCommonCodes
- * @description 공통코드 전체 목록을 조회한다. (GET, code 미지정)
- * @returns {Promise<object[]>} 문서 배열(lean)
+ * @function getCommonCodeByCode
+ * @description 특정 code에 해당하는 공통코드를 조회한다. (GET, code 지정)
+ * @param {string} code 조회할 code
+ * @returns {Promise<object|null>} 문서(lean) 또는 null
  */
-async function getAllCommonCodes() {
-  return CommonCode.find({ deletedAt: null }).sort({ depth: 1, code: 1 }).lean();
+async function getCommonCodeByCode(code) {
+  return CommonCode.findOne({ code: code, deletedAt: null }).lean();
 }
 
 /**
@@ -69,10 +76,7 @@ async function getAllCommonCodes() {
  * @returns {Promise<{filters: object[], categories: object[]}>}
  */
 async function getAllCommonCodes() {
-  const codes = await CommonCode
-    .find({ deletedAt: null })
-    .sort({ depth: 1, code: 1 })
-    .lean();
+  const codes = await CommonCode.find({ deletedAt: null }).sort({ depth: 1, code: 1 }).lean();
 
   /** @type {object[]} */
   const filters = [];
@@ -96,4 +100,5 @@ module.exports = {
   saveCommonCode,
   getAllCommonCodes,
   getCommonCodeByCode,
+  updateCommonCode,
 };
