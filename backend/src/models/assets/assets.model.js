@@ -41,7 +41,7 @@ const assetSchema = new Schema({
   /** 파일 크기(바이트) */
   sizeBytes: { type: Number },
 
-  thunbnail: { type: string },
+  thumbnail: { type: String },
 
   /** 카테고리 정보 객체 */
   category: {

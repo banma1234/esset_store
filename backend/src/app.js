@@ -6,7 +6,6 @@ const { mongoHealth } = require('./config/mongo');
 const commonCodeRoutes = require('./routes/commonCode.routes');
 const presignedRoutes = require('./routes/presigned.routes');
 const commitRoutes = require('./routes/commit.routes');
-const dbRoutes = require('./routes/db.routes');
 const logRoutes = require('./routes/logs.routes');
 
 const test2Routes = require('./routes/test2.routes');
@@ -33,7 +32,6 @@ app.get('/api/v1/test', (req, res) => {
   res.json({ message: 'test successful' });
 });
 
-app.use('/api/v1/db', dbRoutes);
 app.use(commonCodeRoutes);
 app.use(presignedRoutes);
 app.use(commitRoutes);

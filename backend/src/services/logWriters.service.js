@@ -1,4 +1,4 @@
-const Asset = require('../models/assets/assets');
+const Asset = require('../models/assets/assets.model');
 const { AppError } = require('../errors/appError');
 
 /**
