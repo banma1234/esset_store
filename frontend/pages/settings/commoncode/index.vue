@@ -18,7 +18,7 @@
                         </v-alert>
 
                         <v-treeview v-else :items="tree.items" :open.sync="tree.open" :active.sync="tree.active"
-                            item-key="id" item-children="children" activatable open-on-click dense transition
+                            item-key="_id" item-children="children" activatable open-on-click dense transition
                             @update:active="onActiveChange">
                             <!-- 라벨만 커스텀 (루트는 code 숨김) -->
                             <template #label="{ item }">
@@ -102,7 +102,7 @@ export default {
                 loading: false,
                 error: '',
                 valid: false,
-                data: { code: '', name: '', isActive: true, updatedAt: null },
+                data: { _id: '', code: '', name: '', isActive: true, updatedAt: null },
                 codeParts: { major: '', minor: '' }
             },
             isActiveItems: [
@@ -130,14 +130,14 @@ export default {
         }
     },
 
-    hasActive() {
-        return Array.isArray(this.tree.active) && this.tree.active.length > 0
-    },
+    // hasActive() {
+    //     return Array.isArray(this.tree.active) && this.tree.active.length > 0
+    // },
 
-    isActionEnabled() {
-        // 🔹 노드가 선택되어 있거나 생성 모드일 때만 활성화
-        return this.hasActive || this.ui.createMode
-    },
+    // isActionEnabled() {
+    //     // 🔹 노드가 선택되어 있거나 생성 모드일 때만 활성화
+    //     return this.hasActive || this.ui.createMode
+    // },
 
     watch: {
         // 코드가 바뀌면 자동으로 대/소분류 갱신
@@ -158,7 +158,7 @@ export default {
             this.tree.open = []       // ← 초기에는 아무 노드도 열지 않음
             this.tree.active = []
             this.detail.error = ''
-            this.detail.data = { code: '', name: '', isActive: true, updatedAt: null }
+            this.detail.data = { _id: '', code: '', name: '', isActive: true, updatedAt: null, parentId: null }
             this.detail.codeParts = { major: '', minor: '' }
             this.ui.createMode = false
 
@@ -178,7 +178,7 @@ export default {
         /** 라벨 클릭 시 부모/자식 모두 선택되도록 강제 */
         onNodeSelect(item) {
             // 활성 노드로 지정(뷰/하이라이트 일치)
-            this.tree.active = [item.id]
+            this.tree.active = [item._id]
             // code 없으면 스킵(루트라도 보통 code는 있음; 없을 가능성 대비)
             if (!item.code) return
 
@@ -224,10 +224,12 @@ export default {
                 if (!one) throw new Error('상세 응답이 비어 있습니다.')
 
                 this.detail.data = {
+                    _id: one._id || null,
                     code: one.code || '',
                     name: one.name || '',
                     isActive: typeof one.isActive === 'boolean' ? one.isActive : true,
-                    updatedAt: one.updatedAt || null
+                    updatedAt: one.updatedAt || null,
+                    parentId: one.parentId || null
                 }
                 this.detail.codeParts = this.splitCode(this.detail.data.code)
 
@@ -247,13 +249,17 @@ export default {
 
             // 부모가 있으면 대분류=부모 code, 없으면(루트) 대분류=''
             const major = parent?.code || ''
+            const parentId = parent?._id || null
             this.detail.codeParts = { major, minor: '' }
             this.detail.data = {
+                _id: null,
+                parentId: parentId,
                 code: major,       // 화면상 read-only 전체코드는 참고용(실제 저장은 onSave에서 합침)
                 name: '',
                 isActive: true,
                 updatedAt: null
             }
+
         },
 
         // 🔹 저장(검증 → 콘솔 출력; API 호출 없음)
@@ -269,8 +275,8 @@ export default {
                 return
             }
 
-            const parentId = this.hasActive ? this.detail.codeParts.major : ''
-            const major = this.hasActive ? this.detail.codeParts.major + '-' : ''
+            const parentId = this.hasActive ? this.detail.data.parentId : null
+            const major = (this.hasActive && this.ui.createMode) ? this.detail.codeParts.major + '-' : this.detail.codeParts.major
             const minor = this.detail.codeParts.minor
             const fullCode = major + minor  // ← 저장 시점에만 합치기 (요구사항 3 반영)
 
@@ -286,7 +292,6 @@ export default {
             const res = await this.$err.guard(async () => {
                 if (this.ui.createMode) {
                     const res = await this.$api.post('/commoncode', payload);
-                    console.log(res.data);
 
                     return res;
                 }

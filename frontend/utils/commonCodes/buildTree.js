@@ -5,7 +5,7 @@ export function buildTree(rows = []) {
   // 1) 노드 사전 생성 (v-treeview 필수 필드 포함)
   rows.forEach((r) => {
     byId.set(r._id, {
-      id: r._id,
+      _id: r._id,
       code: r.code,
       name: r.name,
       depth: r.depth,

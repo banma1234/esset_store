@@ -54,9 +54,9 @@ async function saveCommonCode(payload) {
 }
 
 async function updateCommonCode(payload) {
-  const { code, name, isActive, parentId } = payload;
+  const { code, name, isActive } = payload;
 
-  await CommonCode.updateOne({ _id: parentId }, { code, name, isActive });
+  await CommonCode.updateOne({ code: code }, { code, name, isActive });
 }
 
 /**

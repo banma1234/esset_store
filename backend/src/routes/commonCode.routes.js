@@ -52,7 +52,6 @@ async function commonCodeHandler(req, res, next) {
 
     // PUT : 수정
     if (req.method === 'PUT') {
-      console.log(req.body);
       await updateCommonCode(req.body);
 
       return res.status(201).json({ ok: true });

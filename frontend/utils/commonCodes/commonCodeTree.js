@@ -14,7 +14,7 @@ import { buildTree } from "./buildTree";
 
 /**
  * @typedef {Object} TreeNode
- * @property {string} id
+ * @property {string} _id
  * @property {string} code
  * @property {string} name
  * @property {number} depth
@@ -52,7 +52,7 @@ export function findTreeNodeById(items = [], id) {
 
   while (queue.length) {
     const cur = queue.shift();
-    if (cur.id === id) return cur;
+    if (cur._id === id) return cur;
     if (cur.children && cur.children.length) {
       queue.push(...cur.children);
     }
@@ -73,6 +73,7 @@ export function buildFilterRoots(rows = []) {
   const roots = buildTree(rows);
 
   return roots.map((root) => ({
+    _id: root._id,
     code: root.code,
     name: root.name,
     options: flattenChildren(root),
