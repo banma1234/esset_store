@@ -1,4 +1,4 @@
-const CommonCode = require('../models/CommonCode');
+const CommonCode = require('../models/CommonCode.model.js');
 const { AppError } = require('../errors/appError');
 const { ObjectId } = require('mongodb');
 
