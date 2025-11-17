@@ -145,9 +145,6 @@ export async function upload3DModel({ file, api, policy, userMeta }) {
 
   const key = `assets/staging/${meta.fileName}/${userMeta.version}/${meta.fileName}.${meta.extension}`;
 
-  console.log(userMeta);
-  console.log("===========================");
-
   const presign = await requestPresign(api, meta, key);
   await uploadViaPresignedPut(presign.url, file, presign.headers);
   await requestCommit(api, key, meta, userMeta);
