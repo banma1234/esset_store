@@ -23,7 +23,7 @@ const { AppError } = require('../errors/appError');
 /**
  * @typedef {Object} AssetSnapshotPayload
  * @property {string} assetId 에셋 ID
- * @property {number} version 버전 번호
+ * @property {number|string} version 버전 번호 또는 문자열
  * @property {string} fileType 파일 형식
  * @property {number} [sizeBytes] 파일 크기(바이트)
  * @property {boolean} [previewable] 미리보기 가능 여부
@@ -55,17 +55,6 @@ async function writeAssetEvent(payload) {
   // eslint-disable-next-line no-console
   console.log('[LOG][assetEvents]', payload);
 }
-
-/**
- * @typedef {Object} AssetSnapshotPayload
- * @property {string} assetId 에셋 ID
- * @property {number|string} version 버전 번호 또는 문자열
- * @property {string} fileType 파일 형식
- * @property {number} [sizeBytes] 파일 크기(바이트)
- * @property {boolean} [previewable] 미리보기 가능 여부
- * @property {string} [cdnUrl] CDN URL
- * @property {string} [thumbCdnUrl] 썸네일 CDN URL
- */
 
 /**
  * @function writeAssetSnapshot
