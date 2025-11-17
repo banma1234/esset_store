@@ -24,7 +24,7 @@ async function getMetaData(key) {
  * @return {boolean} ok
  */
 async function checkMetaCorrect(body) {
-  const { key, contentLength } = await getMetaData(body.key);
+  const { key, contentLength, version } = await getMetaData(body.key);
 
   if (!/\/staging\//.test(key)) {
     throw new AppError('유효한 파일 경로가 아닙니다.', 422, 'KEY_INCORRECT');
@@ -34,6 +34,9 @@ async function checkMetaCorrect(body) {
   }
   if (body.sizeBytes !== contentLength) {
     throw new AppError('파일 크기가 일치하지 않습니다.', 422, 'SIZE_MISMATCH');
+  }
+  if (version === body.userMeta.version) {
+    throw new AppError('기존 파일과 버전이 겹칩니다.', 422, 'VERSION_MISMATCH');
   }
 }
 

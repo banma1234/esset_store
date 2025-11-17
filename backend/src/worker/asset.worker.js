@@ -13,7 +13,7 @@ const { AppError } = require('../errors/appError');
  * @property {string} thumbKey 결과 썸네일 업로드 키
  * @property {number} width    썸네일 너비
  * @property {number} height   썸네일 높이
- * @property {string} version  버전
+ * @property {Object} userMeta  사용자 지정 메타데이터
  */
 
 function assertJobData(data) {
@@ -25,6 +25,9 @@ function assertJobData(data) {
   }
   if (!Number.isFinite(data?.width) || !Number.isFinite(data?.height)) {
     throw new AppError('파일 크기가 일치하지 않습니다.', 422, 'SIZE_MISMATCH');
+  }
+  if (!data?.userMeta.version) {
+    throw new AppError('버전이 존재하지 않습니다.', 422, 'VERSION_REQUIRED');
   }
 }
 
@@ -49,15 +52,33 @@ const worker = new Worker(
     const updatedGltfStr = await injectMetadata({
       gltfJsonStr: gltfStr,
       thumbJpeg: jpeg,
-      version: data.version,
-      userData: {
-        rig: {},
-        links: {},
-      },
+      version: data.userMeta.version,
+      userData: data.userMeta.userData,
     });
 
+    console.log('========================');
+    // ✅ 즉시 구조 점검
+    const dbg = JSON.parse(updatedGltfStr);
+    console.log('[dbg] images has', dbg.images?.length, 'items');
+    console.log(
+      '[dbg] images.uri?  ',
+      dbg.images?.map((i) => typeof i?.uri === 'string'),
+    );
+    console.log(
+      '[dbg] images.bv?   ',
+      dbg.images?.map((i) => Number.isInteger(i?.bufferView)),
+    );
+    console.log(
+      '[dbg] buffers.uri? ',
+      dbg.buffers?.map((b) => typeof b?.uri === 'string'),
+    );
+
+    // 이 시점에 images[*]는 (uri || bufferView) 중 하나가 반드시 true 여야 합니다.
+
+    // finalMeta 생성에서 문제
     const finalMeta = await extractGltfMetadata(updatedGltfStr);
     console.log('\n\n');
+    // 출력되지 않음
     console.log(finalMeta);
     console.log('\n\n');
 

@@ -1,10 +1,8 @@
+// src/services/assets/injectMetaData.service.js
 /**
  * @file inject-metadata.service.js
- * @description glTF(JSON, Embedded)에 썸네일/버전/업로드일/userData 주입 (glTF-Transform v4)
- * - v4: Image는 별도 리스트가 아닌 Texture에 통합됨. (root.listImages() 없음)
- * - 썸네일은 Texture로 생성하고 setURI(data:)로 바로 임베드 → writeJSON 후처리 불필요
+ * @description glTF(JSON, Embedded)에 썸네일/버전/업로드일/userData 주입 (gltf-transform v4)
  */
-
 const { Buffer } = require('buffer');
 const core = require('@gltf-transform/core');
 
@@ -17,18 +15,11 @@ if (typeof NodeIO !== 'function' || typeof Document !== 'function') {
 
 /**
  * @typedef {Object} InjectParams
- * @property {string} gltfJsonStr      - glTF(JSON) 문자열(Embedded 전제)
- * @property {Buffer|Uint8Array} thumbJpeg - JPEG 썸네일 바이트
- * @property {string} version          - 예: "1.0.0"
- * @property {string|Date=} uploadedAt - 업로드일(ISO 권장)
- * @property {Record<string, any>=} userData - 임의 사용자 데이터
- */
-
-/**
- * @function injectMetadata
- * @description glTF 본문에 메타데이터(썸네일/버전/업로드일/userData)를 주입한다.
- * @param {InjectParams} params
- * @returns {Promise<string>} 메타 주입이 반영된 glTF(JSON) 문자열
+ * @property {string} gltfJsonStr
+ * @property {Buffer|Uint8Array} thumbJpeg
+ * @property {string} version
+ * @property {string|Date=} uploadedAt
+ * @property {Record<string, any>=} userData
  */
 async function injectMetadata(params) {
   const { gltfJsonStr, thumbJpeg, version, uploadedAt, userData = {} } = params;
@@ -36,29 +27,34 @@ async function injectMetadata(params) {
   if (typeof gltfJsonStr !== 'string' || gltfJsonStr.length < 10) {
     throw new Error('injectMetadata: INVALID_GLTF_JSON');
   }
-  const jpegBytes = thumbJpeg instanceof Uint8Array ? thumbJpeg : new Uint8Array(Buffer.from(thumbJpeg));
-  if (!jpegBytes.length) throw new Error('injectMetadata: thumbJpeg(썸네일) 누락');
+  if (!thumbJpeg || (thumbJpeg.length ?? 0) === 0) {
+    throw new Error('injectMetadata: thumbJpeg(썸네일) 누락');
+  }
 
   // 1) JSON → Document
   const io = new NodeIO();
   const json = JSON.parse(gltfJsonStr);
-  const doc = await io.readJSON({ json, resources: {} }); // v4: 객체 매핑 사용
+  const doc = await io.readJSON({ json, resources: new Map() });
   const root = doc.getRoot();
 
-  // 2) 썸네일 텍스처 생성/교체 (v4: Texture가 이미지+텍스처 역할)
-  const THUMB_NAME = '__es_thumbnail__';
-  let thumbTex = root.listTextures().find((t) => t.getName?.() === THUMB_NAME);
-  if (!thumbTex) thumbTex = doc.createTexture(THUMB_NAME);
+  // 2) 썸네일 텍스처 생성/교체 (v4: Texture만 사용)
+  const THUMB_TEX_NAME = '__es_thumbnail__';
+  let thumbTex = root.listTextures().find((t) => t.getName?.() === THUMB_TEX_NAME);
+  if (!thumbTex) thumbTex = doc.createTexture(THUMB_TEX_NAME);
 
-  // (A) setURI(data:)만으로 임베드 — resources 후처리 불필요
-  const dataUri = `data:image/jpeg;base64,${Buffer.from(jpegBytes).toString('base64')}`;
-  thumbTex.setURI(dataUri).setMimeType('image/jpeg');
+  const jpegBytes = thumbJpeg instanceof Uint8Array ? thumbJpeg : new Uint8Array(Buffer.from(thumbJpeg));
 
-  // 텍스처 인덱스(= 추후 내보낸 glTF의 images[] 인덱스와 일치하도록 보장됨)
+  // 핵심: setURI로 "파일명"도 지정 → writeJSON 시 images[*].uri 생성 보장
+  thumbTex
+    .setImage(jpegBytes) // 실제 바이트
+    .setMimeType('image/jpeg') // MIME
+    .setURI('es-thumb.jpg') // ★ 없으면 bufferView로 나갈 수 있음 → re-read 시 오류 유발
+    .setName(THUMB_TEX_NAME);
+
   const textures = root.listTextures();
   const textureIndex = textures.indexOf(thumbTex);
 
-  // 3) 최상위 Root.extras에 메타 저장 (asset.extras가 아님)
+  // 3) extras는 Root에 기록 (asset.setExtras 아님)
   const prevRootExtras = (typeof root.getExtras === 'function' && root.getExtras()) || {};
   root.setExtras({
     ...prevRootExtras,
@@ -70,10 +66,47 @@ async function injectMetadata(params) {
     esUserData: { ...userData },
   });
 
-  // 4) Document → JSON (Embedded 유지)
-  const out = await io.writeJSON(doc); // { json, resources }
-  // dataURI를 사용했으므로 out.resources에 썸네일 바이트는 남지 않음.
-  return JSON.stringify(out.json);
+  // 4) 내보내기(분리 리소스) → data:URI 인라인
+  const out = await io.writeJSON(doc);
+  const outJson = out.json;
+  const res = out.resources || {}; // v4는 객체(Record<string, ArrayBuffer>)
+
+  // images[*].uri → data:URI
+  if (Array.isArray(outJson.images)) {
+    for (const imgDef of outJson.images) {
+      const key = imgDef && imgDef.uri;
+      if (!key) continue; // (bufferView 경로는 건드리지 않음)
+      const bin = res[key];
+      if (!bin) continue;
+      const mime = imgDef.mimeType || 'image/png';
+      const b64 = Buffer.from(bin).toString('base64');
+      imgDef.uri = `data:${mime};base64,${b64}`;
+      delete res[key];
+    }
+  }
+
+  // buffers[*].uri → data:URI (있을 때만)
+  if (Array.isArray(outJson.buffers)) {
+    for (const bufDef of outJson.buffers) {
+      const key = bufDef && bufDef.uri;
+      if (!key) continue;
+      const bin = res[key];
+      if (!bin) continue;
+      const b64 = Buffer.from(bin).toString('base64');
+      bufDef.uri = `data:application/octet-stream;base64,${b64}`;
+      delete res[key];
+    }
+  }
+
+  // 5) 검증: 모든 image가 uri 또는 bufferView 보유
+  if (Array.isArray(outJson.images)) {
+    const bad = outJson.images.findIndex((img) => !img || (!img.uri && typeof img.bufferView !== 'number'));
+    if (bad !== -1) {
+      throw new Error(`injectMetadata: images[${bad}]가 uri/bufferView 둘 다 없습니다.`);
+    }
+  }
+
+  return JSON.stringify(outJson);
 }
 
 module.exports = { injectMetadata };

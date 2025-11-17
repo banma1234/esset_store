@@ -3,9 +3,9 @@ const { AppError } = require('../errors/appError');
 
 /**
  * @typedef {Object} EnqueueThumbPayload
- * @property {string} gltfKey   .gltf 객체 키
+ * @property {string} key   .gltf 객체 키
  * @property {string} fileName  에셋 파일명(폴더 구성용)
- * @property {number} version   버전 번호
+ * @property {Object} userMeta   사용자 지정 메타데이터
  * @property {string=} fileBase 썸네일 파일명 베이스(생략 시 timestamp)
  * @property {number=} width    기본 200
  * @property {number=} height   기본 200
@@ -31,10 +31,10 @@ function buildThumbKey(fileName, version, base) {
 
 /**
  * @function buildJobId
- * @description 멱등 잡 ID(동일 gltfKey/thumbKey 조합의 중복 등록 방지)
+ * @description 멱등 잡 ID(동일 key/thumbKey 조합의 중복 등록 방지)
  */
-function buildJobId(gltfKey, thumbKey) {
-  return `thumb@${gltfKey}@${thumbKey}`;
+function buildJobId(key, thumbKey) {
+  return `thumb@${key}@${thumbKey}`;
 }
 
 /**
@@ -43,22 +43,21 @@ function buildJobId(gltfKey, thumbKey) {
  * @param {EnqueueThumbPayload} body
  */
 async function enqueueThumbnailJob(body) {
-  const { key, fileName, version } = body;
+  const { key, fileName, userMeta } = body;
   const { width, height } = DEFAULT_PAGE_SETUP;
+
+  console.log(userMeta);
 
   if (!key || !key.toLowerCase().endsWith('gltf')) {
     throw new AppError('유효한 key값이 아닙니다.', 422, 'KEY_MISMATCH');
   }
 
-  const thumbKey = buildThumbKey(fileName, version, `thumb_${fileName}_`);
+  const thumbKey = buildThumbKey(fileName, userMeta.version, `thumb_${fileName}_`);
   const jobId = buildJobId(key, thumbKey);
-
-  //   await assetPipelineQueue.resume(); // 글로벌 resume
-  //   await assetPipelineQueue.resume(true); // 로컬 resume
 
   const job = await assetPipelineQueue.add(
     'generate-thumbnail',
-    { key, thumbKey, width, height, version },
+    { key, thumbKey, width, height, userMeta },
     {
       jobId,
       removeOnComplete: 1000,

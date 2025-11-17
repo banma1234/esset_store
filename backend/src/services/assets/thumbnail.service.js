@@ -132,6 +132,7 @@ async function renderGltfToJpeg(gltfStr, { width, height }) {
 
       // === 씬 구성 ===
       const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1f1f1f);
       const camera = new THREE.PerspectiveCamera(45, W / H, 0.01, 10000);
       scene.add(new THREE.AmbientLight(0xffffff, 0.9));
       const dir = new THREE.DirectionalLight(0xffffff, 0.9);
