@@ -31,13 +31,8 @@ export function extractMeta(file) {
   const extension = dot > -1 ? file.name.slice(dot + 1).toLowerCase() : "";
   const sizeBytes = typeof file.size === "number" ? file.size : 0;
   const contentType = file.type || "application/octet-stream";
-  const base = dot > -1 ? file.name.slice(0, dot) : fileName;
-  const verMatch =
-    base.match(/[_\-\.]v(\d+(?:[\._]\d+)*)$/i) /* _v1, -v1.2, .v2_0 등 */ ||
-    base.match(/[_\-\.](\d{8})$/); /* 뒤에 날짜형(예: _20250101) */
-  const version = verMatch ? verMatch[1].replace(/_/g, ".") : "1.0.0";
 
-  return { fileName, extension, sizeBytes, version, contentType };
+  return { fileName, extension, sizeBytes, contentType };
 }
 
 /**
@@ -116,13 +111,14 @@ async function uploadViaPresignedPut(url, file, headers = {}) {
   }
 }
 
-async function requestCommit(api, key, meta) {
+async function requestCommit(api, key, meta, userMeta) {
   try {
     const res = api.post("/assets/commit", {
       fileName: meta.fileName,
       sizeBytes: meta.sizeBytes,
       version: meta.version,
       key: key,
+      userMeta: userMeta,
     });
 
     return res;
@@ -140,18 +136,21 @@ async function requestCommit(api, key, meta) {
  * @param {UploadPolicy=} params.policy 유효성 검사 정책(옵션)
  * @returns {Promise<{ meta: FileMeta, presign: any, result: { ok: true } }>}
  */
-export async function upload3DModel({ file, api, policy }) {
+export async function upload3DModel({ file, api, policy, userMeta }) {
   if (!file) throw new Error("업로드할 파일이 없습니다.");
   if (!api) throw new Error("API 헬퍼가 필요합니다.");
 
   const meta = extractMeta(file);
   validateByPolicy(meta, policy);
 
-  const key = `assets/staging/${meta.fileName}/${meta.version}/${meta.fileName}.${meta.extension}`;
+  const key = `assets/staging/${meta.fileName}/${userMeta.version}/${meta.fileName}.${meta.extension}`;
+
+  console.log(userMeta);
+  console.log("===========================");
 
   const presign = await requestPresign(api, meta, key);
   await uploadViaPresignedPut(presign.url, file, presign.headers);
-  await requestCommit(api, key, meta);
+  await requestCommit(api, key, meta, userMeta);
 
   return { meta, presign, result: { ok: true } };
 }
