@@ -1,9 +1,5 @@
-/**
- * @file 로그 라이터 서비스(골조)
- * @description
- * - 공통 핸들러에서 분기 호출되는 “목적별” 로그 함수 모음
- * - 현재는 콘솔 출력만 수행한다. (DB 저장 로직은 이후 단계에서 연결)
- */
+const Asset = require('../models/assets/assets');
+const { AppError } = require('../errors/appError');
 
 /**
  * @typedef {Object} DownloadLogPayload
@@ -61,15 +57,39 @@ async function writeAssetEvent(payload) {
 }
 
 /**
+ * @typedef {Object} AssetSnapshotPayload
+ * @property {string} assetId 에셋 ID
+ * @property {number|string} version 버전 번호 또는 문자열
+ * @property {string} fileType 파일 형식
+ * @property {number} [sizeBytes] 파일 크기(바이트)
+ * @property {boolean} [previewable] 미리보기 가능 여부
+ * @property {string} [cdnUrl] CDN URL
+ * @property {string} [thumbCdnUrl] 썸네일 CDN URL
+ */
+
+/**
  * @function writeAssetSnapshot
- * @description 에셋 스냅샷 로그를 처리한다. (현재: 콘솔 출력)
- * @param {AssetSnapshotPayload} payload 에셋 스냅샷 페이로드
+ * @description 에셋의 최신버전 스냅샷 저장
+ * @param {AssetSnapshotPayload} payload 스냅샷 로그 페이로드
  * @returns {Promise<void>}
  */
 async function writeAssetSnapshot(payload) {
-  // 이후 단계: assetVersions 컬렉션에 insert
-  // eslint-disable-next-line no-console
-  console.log('[LOG][assetVersions]', payload);
+  try {
+    await Asset.findOneAndUpdate(
+      { $set: payload },
+      {
+        upsert: true, // 없으면 새 문서 생성
+      },
+    );
+
+    // eslint-disable-next-line no-console
+    console.log('[LOG][assetVersions][saved]', {
+      fileName: payload.fileName,
+      version: payload.latestVersion.version,
+    });
+  } catch (err) {
+    throw new AppError('스냅샷 저장 중 오류가 발생했습니다.', 422, err);
+  }
 }
 
 module.exports = {
