@@ -36,7 +36,6 @@
                 </v-card>
             </v-col>
 
-
             <!-- 우측: 상세 보기 -->
             <v-col cols="12" md="6">
                 <v-card>
@@ -64,7 +63,7 @@
                                 <v-text-field class="mr-2 flex-major" label="대분류" v-model="detail.codeParts.major"
                                     outlined dense :disabled="true" />
                                 <v-text-field class="flex-minor" label="소분류" v-model="detail.codeParts.minor" outlined
-                                    dense :disabled="!isActionEnabled" />
+                                    dense :disabled="!ui.createMode" />
                             </div>
 
                             <v-text-field label="이름 (name)" v-model="detail.data.name" outlined dense
@@ -129,15 +128,6 @@ export default {
             return this.hasActive || this.ui.createMode
         }
     },
-
-    // hasActive() {
-    //     return Array.isArray(this.tree.active) && this.tree.active.length > 0
-    // },
-
-    // isActionEnabled() {
-    //     // 🔹 노드가 선택되어 있거나 생성 모드일 때만 활성화
-    //     return this.hasActive || this.ui.createMode
-    // },
 
     watch: {
         // 코드가 바뀌면 자동으로 대/소분류 갱신
@@ -304,7 +294,6 @@ export default {
 
             this.ui.createMode = false
             this.reload();
-            // 필요 시 여기서 폼 초기화/선택 해제/리로드 등 처리
         },
         // 🔹 취소(생성 취소 + 선택 해제 + 상세 초기화)
         onCancel() {
