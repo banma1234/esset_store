@@ -46,8 +46,6 @@ async function enqueueThumbnailJob(body) {
   const { key, fileName, userMeta } = body;
   const { width, height } = DEFAULT_PAGE_SETUP;
 
-  console.log(userMeta);
-
   if (!key || !key.toLowerCase().endsWith('gltf')) {
     throw new AppError('유효한 key값이 아닙니다.', 422, 'KEY_MISMATCH');
   }
@@ -57,7 +55,7 @@ async function enqueueThumbnailJob(body) {
 
   const job = await assetPipelineQueue.add(
     'generate-thumbnail',
-    { key, thumbKey, width, height, userMeta },
+    { key, thumbKey, width, height, userMeta, body },
     {
       jobId,
       removeOnComplete: 1000,

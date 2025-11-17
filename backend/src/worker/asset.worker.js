@@ -1,7 +1,7 @@
 const { Worker } = require('bullmq');
 const { queueOptions, QUEUE_NAME } = require('../queues/asset.queue');
-const { getSafeObjectBuffer, putThumbnail } = require('../services/assets/assets.service');
-const { renderGltfToJpeg } = require('../services/assets/thumbnail.service');
+const { getSafeObjectBuffer, saveSafeModel } = require('../services/assets/assets.service');
+const { renderGltfToJpeg, putThumbnail } = require('../services/assets/thumbnail.service');
 const { extractGltfMetadata } = require('../services/assets/unpackageAssets.service');
 const { injectMetadata } = require('../services/assets/injectMetaData.service');
 
@@ -14,6 +14,7 @@ const { AppError } = require('../errors/appError');
  * @property {number} width    썸네일 너비
  * @property {number} height   썸네일 높이
  * @property {Object} userMeta  사용자 지정 메타데이터
+ * @property {Object} body  요청 바디
  */
 
 function assertJobData(data) {
@@ -37,11 +38,11 @@ const worker = new Worker(
    * @param {import('bullmq').Job<ThumbJobData>} job
    */
   async (job) => {
-    const data = job.data;
+    const { key, userMeta, body } = job.data;
     assertJobData(data);
 
     // 1) GLTF 본문 로드(UTF-8)
-    const gltfBuffer = await getSafeObjectBuffer(data.key);
+    const gltfBuffer = await getSafeObjectBuffer(key);
     const gltfStr = gltfBuffer.toString('utf8');
 
     // 2) 썸네일 생성(서비스)
@@ -52,8 +53,8 @@ const worker = new Worker(
     const updatedGltfStr = await injectMetadata({
       gltfJsonStr: gltfStr,
       thumbJpeg: jpeg,
-      version: data.userMeta.version,
-      userData: data.userMeta.userData,
+      version: userMeta.version,
+      userData: userMeta.userData,
     });
 
     console.log('========================');
@@ -73,18 +74,22 @@ const worker = new Worker(
       dbg.buffers?.map((b) => typeof b?.uri === 'string'),
     );
 
-    // 이 시점에 images[*]는 (uri || bufferView) 중 하나가 반드시 true 여야 합니다.
+    await saveSafeModel({
+      key: key,
+      gltfJsonStr: updatedGltfStr,
+      body: body,
+      userMeta: userMeta,
+    });
 
     // finalMeta 생성에서 문제
     const finalMeta = await extractGltfMetadata(updatedGltfStr);
     console.log('\n\n');
-    // 출력되지 않음
     console.log(finalMeta);
     console.log('\n\n');
 
     return {
       status: 'ok',
-      key: data.key,
+      key: key,
       thumbKey: data.thumbKey,
       width: data.width,
       height: data.height,

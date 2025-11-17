@@ -93,22 +93,75 @@ async function promoteStagingToFinal(body) {
 }
 
 /**
- * @function putThumbnail
- * @description JPEG 썸네일 업로드.
- * @param {string} key
- * @param {Buffer|Uint8Array} buffer
- * @param {string} [cacheControl]
+ * @typedef {Object} PersistOptions
+ * @property {string} key         업로드할 S3 키(예: "assets/final/xxx/1.0.6/xxx.gltf")
+ * @property {string} gltfJsonStr glTF JSON 문자열(임베디드 data:URI 포함)
  */
-async function putThumbnail(key, buffer, cacheControl = 'public, max-age=31536000, immutable') {
+
+/**
+ * @function saveSafeModel
+ * @description glTF JSON 문자열을 .gltf로 S3에 업로드한다.
+ * @param {PersistOptions} payload
+ * @returns {Promise<{ key: string, bytes: number }>}
+ */
+async function saveSafeModel(payload) {
+  const { key, gltfJsonStr, body, userMeta } = payload || {};
+
+  if (typeof gltfJsonStr !== 'string' || gltfJsonStr.length < 10) {
+    throw new Error('saveSafeModel: 유효한 glTF JSON 문자열이 필요합니다.');
+  }
+
+  // 1) 파싱 + 최소 검증(뷰어 호환성)
+  let json;
+  try {
+    json = JSON.parse(gltfJsonStr);
+  } catch {
+    throw new Error('saveSafeModel: JSON.parse 실패 — 올바른 glTF JSON이 아닙니다.');
+  }
+
+  // 2) 문자열화(미니파이 기본)
+  const outStr = JSON.stringify(json);
+  const GLTFModel = Buffer.from(outStr, 'utf8');
+
   await s3.send(
     new PutObjectCommand({
       Bucket: S3_BUCKET,
-      Key: key,
-      Body: buffer,
-      ContentType: 'image/jpeg',
-      CacheControl: cacheControl,
+      Key: finalKey, // 같은 키에 덮어쓰기
+      Body: GLTFModel,
+      ContentType: 'model/gltf+json',
+      CacheControl: 'public, max-age=0, s-maxage=0, must-revalidate', // 재검증 강제
     }),
   );
+
+  const { CDN_BASE_URL, S3_ENDPOINT } = process.env;
+  const zzzz = {
+    fileName: body.fileName,
+    fileType: body.fileType,
+    sizeBytes: body.sizeBytes,
+    thumbnail: `${CDN_BASE_URL}/${data.thumbKey.replace(S3_ENDPOINT, '')}`,
+    category: userMeta.category,
+    filters: userMeta.filters,
+  };
+
+  handleLogEvent({
+    type: 'ASSET_SNAPSHOT',
+    payload: {
+      ...zzzz,
+      latestVersion: {
+        version: userMeta.version,
+        url: `${CDN_BASE_URL}/${key.replace(S3_ENDPOINT, '')}`,
+      },
+    },
+  });
+  handleLogEvent({
+    type: 'ASSET_EVENT',
+    payload: {
+      ...zzzz,
+      version: userMeta.version,
+    },
+  });
+
+  return { ok: true };
 }
 
-module.exports = { checkMetaCorrect, putThumbnail, getSafeObjectBuffer, promoteStagingToFinal, getMetaData };
+module.exports = { checkMetaCorrect, getSafeObjectBuffer, promoteStagingToFinal, getMetaData, saveSafeModel };

@@ -186,4 +186,23 @@ async function renderGltfToJpeg(gltfStr, { width, height }) {
   }
 }
 
-module.exports = { getBrowser, newPage, renderGltfToJpeg };
+/**
+ * @function putThumbnail
+ * @description JPEG 썸네일 업로드.
+ * @param {string} key
+ * @param {Buffer|Uint8Array} buffer
+ * @param {string} [cacheControl]
+ */
+async function putThumbnail(key, buffer, cacheControl = 'public, max-age=31536000, immutable') {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: 'image/jpeg',
+      CacheControl: cacheControl,
+    }),
+  );
+}
+
+module.exports = { getBrowser, newPage, renderGltfToJpeg, putThumbnail };
