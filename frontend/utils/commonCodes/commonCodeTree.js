@@ -64,20 +64,33 @@ export function findTreeNodeById(items = [], id) {
 /**
  * @function buildFilterRoots
  * @description 필터 공통코드 평면 배열을 v-select 그룹 정보로 변환한다.
- *              - 루트 개수만큼 셀렉트 박스를 만들기 위한 구조
- *              - 각 루트의 모든 하위 노드는 options로 평탄화한다.
+ *              - "필터 옵션" 노드 개수만큼 셀렉트 박스를 만든다.
+ *              - 각 셀렉트 박스의 옵션은 해당 노드의 모든 하위 노드(자식/손자 포함)이다.
  * @param {Array<CommonCodeRow>} rows - 공통코드 행 배열
- * @returns {Array<FilterRoot>} 필터 루트 목록
+ * @returns {Array<FilterRoot>} 필터 루트(= 필터 옵션 노드) 목록
  */
 export function buildFilterRoots(rows = []) {
   const roots = buildTree(rows);
 
-  return roots.map((root) => ({
-    _id: root._id,
-    code: root.code,
-    name: root.name,
-    options: flattenChildren(root),
-  }));
+  /** @type {Array<FilterRoot>} */
+  const filterRoots = [];
+
+  // 최상위 루트들의 "직계 자식"을 필터 옵션 노드로 간주
+  roots.forEach((root) => {
+    if (Array.isArray(root.children) && root.children.length > 0) {
+      root.children.forEach((child) => {
+        filterRoots.push({
+          _id: child._id,
+          code: child.code,
+          name: child.name,
+          // 이 필터 옵션 노드의 모든 하위 노드를 선택 옵션으로 사용
+          options: flattenChildren(child),
+        });
+      });
+    }
+  });
+
+  return filterRoots;
 }
 
 /**
