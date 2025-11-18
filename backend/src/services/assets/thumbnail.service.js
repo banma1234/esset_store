@@ -1,5 +1,11 @@
 const puppeteer = require('puppeteer');
 
+const { PutObjectCommand } = require('@aws-sdk/client-s3');
+const { createS3Client } = require('../../utils/s3');
+const { AppError } = require('../../errors/appError');
+
+const s3 = createS3Client();
+const S3_BUCKET = process.env.S3_BUCKET;
 let _browser = null;
 
 /** @returns {Promise<import('puppeteer').Browser>} */
@@ -26,6 +32,7 @@ async function newPage({ width = 200, height = 200, scale = 1 } = {}) {
   p.on('console', (m) => console.log('[thumb/console]', m.type(), m.text()));
   p.on('pageerror', (e) => console.error('[thumb/pageerror]', e));
   p.on('requestfailed', (r) => console.error('[thumb/requestfailed]', r.url(), r.failure()?.errorText));
+
   return p;
 }
 
@@ -43,10 +50,10 @@ async function newPage({ width = 200, height = 200, scale = 1 } = {}) {
  */
 async function renderGltfToJpeg(gltfStr, { width, height }) {
   if (typeof gltfStr !== 'string' || gltfStr.length < 10) {
-    throw new Error('INVALID_GLTF_JSON: input is not a non-empty string');
+    throw new AppError('올바른 형태의 이미지(string)가 아닙니다.', 422, 'INVALID_GLTF_JSON');
   }
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    throw new Error('INVALID_SIZE');
+    throw new AppError('렌더링 페이지의 크기가 올바르지 않습니다.', 422, 'INVALID_PAGE_SIZE');
   }
 
   let page;
@@ -91,7 +98,7 @@ async function renderGltfToJpeg(gltfStr, { width, height }) {
         try {
           jsonStr = JSON.stringify(payload);
         } catch (e) {
-          throw new Error('INVALID_GLTF_JSON: cannot stringify payload');
+          throw new AppError('이미지 문자열의 JSON 파싱에 실패했습니다.', 432, 'STRINGFY_FAILED');
         }
       }
 
@@ -106,7 +113,7 @@ async function renderGltfToJpeg(gltfStr, { width, height }) {
       try {
         JSON.parse(jsonStr);
       } catch (e) {
-        throw new Error('INVALID_GLTF_JSON: JSON.parse failed');
+        throw new AppError('이미지 문자열의 JSON 파싱에 실패했습니다.', 432, 'STRINGFY_FAILED');
       }
 
       // === 렌더러 생성 ===

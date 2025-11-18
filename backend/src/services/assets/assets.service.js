@@ -6,6 +6,7 @@ const {
   DeleteObjectCommand,
 } = require('@aws-sdk/client-s3');
 const { createS3Client } = require('../../utils/s3');
+const { handleLogEvent } = require('../../utils/logEventHandler');
 const { AppError } = require('../../errors/appError');
 
 const s3 = createS3Client();
@@ -105,10 +106,10 @@ async function promoteStagingToFinal(body) {
  * @returns {Promise<{ key: string, bytes: number }>}
  */
 async function saveSafeModel(payload) {
-  const { key, gltfJsonStr, body, userMeta } = payload || {};
+  const { key, gltfJsonStr, body, userMeta, thumbKey } = payload || {};
 
   if (typeof gltfJsonStr !== 'string' || gltfJsonStr.length < 10) {
-    throw new Error('saveSafeModel: 유효한 glTF JSON 문자열이 필요합니다.');
+    throw new AppError('유효한 glTF JSON 문자열이 아닙니다.', 422, 'INVALID_JSON_STRING');
   }
 
   // 1) 파싱 + 최소 검증(뷰어 호환성)
@@ -116,7 +117,7 @@ async function saveSafeModel(payload) {
   try {
     json = JSON.parse(gltfJsonStr);
   } catch {
-    throw new Error('saveSafeModel: JSON.parse 실패 — 올바른 glTF JSON이 아닙니다.');
+    throw new AppError('gltf의 JSON 파싱에 실패했습니다.', 433, 'FAILED_GLTF_JSON');
   }
 
   // 2) 문자열화(미니파이 기본)
@@ -126,7 +127,7 @@ async function saveSafeModel(payload) {
   await s3.send(
     new PutObjectCommand({
       Bucket: S3_BUCKET,
-      Key: finalKey, // 같은 키에 덮어쓰기
+      Key: key, // 같은 키에 덮어쓰기
       Body: GLTFModel,
       ContentType: 'model/gltf+json',
       CacheControl: 'public, max-age=0, s-maxage=0, must-revalidate', // 재검증 강제
@@ -134,30 +135,20 @@ async function saveSafeModel(payload) {
   );
 
   const { CDN_BASE_URL, S3_ENDPOINT } = process.env;
-  const zzzz = {
-    fileName: body.fileName,
-    fileType: body.fileType,
-    sizeBytes: body.sizeBytes,
-    thumbnail: `${CDN_BASE_URL}/${data.thumbKey.replace(S3_ENDPOINT, '')}`,
-    category: userMeta.category,
-    filters: userMeta.filters,
-  };
 
   handleLogEvent({
     type: 'ASSET_SNAPSHOT',
     payload: {
-      ...zzzz,
+      fileName: body.fileName,
+      fileType: body.fileType,
+      sizeBytes: body.sizeBytes,
+      thumbnail: `${CDN_BASE_URL}${thumbKey.replace(S3_ENDPOINT, '')}`,
+      category: userMeta.userData.category,
+      filters: userMeta.userData.filters,
       latestVersion: {
         version: userMeta.version,
-        url: `${CDN_BASE_URL}/${key.replace(S3_ENDPOINT, '')}`,
+        url: `${CDN_BASE_URL}${key.replace(S3_ENDPOINT, '')}`,
       },
-    },
-  });
-  handleLogEvent({
-    type: 'ASSET_EVENT',
-    payload: {
-      ...zzzz,
-      version: userMeta.version,
     },
   });
 

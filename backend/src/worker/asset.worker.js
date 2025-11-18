@@ -38,26 +38,26 @@ const worker = new Worker(
    * @param {import('bullmq').Job<ThumbJobData>} job
    */
   async (job) => {
-    const { key, userMeta, body } = job.data;
+    const data = job.data;
     assertJobData(data);
 
     // 1) GLTF 본문 로드(UTF-8)
-    const gltfBuffer = await getSafeObjectBuffer(key);
+    const gltfBuffer = await getSafeObjectBuffer(data.key);
     const gltfStr = gltfBuffer.toString('utf8');
 
     // 2) 썸네일 생성(서비스)
     const jpeg = await renderGltfToJpeg(gltfStr, { width: data.width, height: data.height });
+
     // 3) 업로드
     await putThumbnail(data.thumbKey, jpeg);
 
     const updatedGltfStr = await injectMetadata({
       gltfJsonStr: gltfStr,
       thumbJpeg: jpeg,
-      version: userMeta.version,
-      userData: userMeta.userData,
+      version: data.userMeta.version,
+      userData: data.userMeta.userData,
     });
 
-    console.log('========================');
     // ✅ 즉시 구조 점검
     const dbg = JSON.parse(updatedGltfStr);
     console.log('[dbg] images has', dbg.images?.length, 'items');
@@ -75,13 +75,13 @@ const worker = new Worker(
     );
 
     await saveSafeModel({
-      key: key,
+      key: data.key,
       gltfJsonStr: updatedGltfStr,
-      body: body,
-      userMeta: userMeta,
+      body: data.body,
+      userMeta: data.userMeta,
+      thumbKey: data.thumbKey,
     });
 
-    // finalMeta 생성에서 문제
     const finalMeta = await extractGltfMetadata(updatedGltfStr);
     console.log('\n\n');
     console.log(finalMeta);
@@ -89,7 +89,7 @@ const worker = new Worker(
 
     return {
       status: 'ok',
-      key: key,
+      key: data.key,
       thumbKey: data.thumbKey,
       width: data.width,
       height: data.height,
