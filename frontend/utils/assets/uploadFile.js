@@ -115,6 +115,7 @@ async function requestCommit(api, key, meta, userMeta) {
   try {
     const res = api.post("/assets/commit", {
       fileName: meta.fileName,
+      fileType: meta.extension,
       sizeBytes: meta.sizeBytes,
       version: meta.version,
       key: key,

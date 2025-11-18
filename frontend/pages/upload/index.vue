@@ -436,9 +436,6 @@ export default {
 
           const userMeta = await this.mergeMetaData();
 
-          console.log(userMeta)
-          console.log("===========================")
-
           const { meta } = await upload3DModel({
             file: this.state.file,
             api: this.$api,

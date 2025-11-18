@@ -173,12 +173,8 @@ export async function mergeUserMeta(metaFile, selection) {
       parsed.version = nextVersion;
 
       // 🔥 category / filters 는 기존 값을 버리고, 선택 값을 기준으로 강제 덮어쓰기
-      parsed.userData.category = {
-        code: categoryCode,
-      };
-      parsed.userData.filters = filterCodes.map((code) => ({
-        code: code || "",
-      }));
+      parsed.userData.category = categoryCode;
+      parsed.userData.filters = filterCodes;
 
       return parsed;
     }
@@ -188,12 +184,10 @@ export async function mergeUserMeta(metaFile, selection) {
   return {
     version: "1.0.0",
     userData: {
-      category: {
-        code: categoryCode,
-      },
-      filters: filterCodes.map((code) => ({
-        code: code || "",
-      })),
+      category: categoryCode,
+      filters: filterCodes,
+      links: {},
+      rigs: {},
     },
   };
 }
