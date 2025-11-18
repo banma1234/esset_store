@@ -3,10 +3,14 @@
     <v-row justify="center">
       <v-col cols="12" md="8">
         <v-card class="pa-6">
-          <div class="text-subtitle-1 mb-3">3D 모델 업로드 (.glb, .gltf, .stl)</div>
+          <div class="text-subtitle-1 mb-3">
+            3D 모델 업로드 (.gltf)
+          </div>
 
-          <!-- 파일 선택 -->
-          <input ref="fileInput" type="file" accept=".glb,.gltf,.stl,model/*" @change="onPick" />
+          <!-- ===================== -->
+          <!-- 3D 파일 선택           -->
+          <!-- ===================== -->
+          <input ref="fileInput" type="file" accept=".gltf" @change="onPick" />
 
           <!-- 액션 버튼 -->
           <div class="mt-4 d-flex">
@@ -42,17 +46,17 @@
           <v-divider class="my-6" />
 
           <div class="text-subtitle-2 mb-2">
-            사용자 지정 메타데이터 파일 (txt, json)
+            사용자 지정 메타데이터 파일 (json)
           </div>
 
           <v-alert v-if="meta.error" type="error" dense outlined class="mb-2">
             {{ meta.error }}
           </v-alert>
 
-          <input ref="metaInput" type="file" accept=".txt,.json" @change="onMetaPick" />
+          <input ref="metaInput" type="file" accept=".json" @change="onMetaPick" />
 
           <!-- ===================== -->
-          <!-- 카테고리 선택 영역   -->
+          <!-- 카테고리 선택 영역     -->
           <!-- ===================== -->
           <v-divider class="my-6" />
 
@@ -84,7 +88,9 @@
                   <span>
                     {{ item.name }}
                     <template v-if="item.depth > 0 && item.code">
-                      <small class="grey--text"> ({{ item.code }})</small>
+                      <small class="grey--text">
+                        ({{ item.code }})
+                      </small>
                     </template>
                   </span>
                 </template>
@@ -93,7 +99,7 @@
           </v-card>
 
           <!-- ===================== -->
-          <!-- 필터 선택 영역        -->
+          <!-- 필터 선택 영역         -->
           <!-- ===================== -->
           <v-divider class="my-6" />
 
@@ -114,10 +120,10 @@
           </v-row>
 
           <!-- ===================== -->
-          <!-- 테스트 버튼           -->
+          <!-- 테스트 버튼            -->
           <!-- ===================== -->
           <div class="mt-4">
-            <v-btn color="secondary" @click="mergeMetaData">
+            <v-btn color="secondary" @click="onTestMerge">
               테스트
             </v-btn>
           </div>
@@ -132,7 +138,9 @@ import { upload3DModel, DEFAULT_POLICY } from '@/utils/assets/uploadFile'
 import {
   buildCategoryTree,
   buildFilterRoots,
-  findTreeNodeById
+  findTreeNodeById,
+  buildFilterSelectItems,
+  findFilterNodeInRoot
 } from '@/utils/commonCodes/commonCodeTree'
 import { getExt, mergeUserMeta } from '@/utils/assets/getMetaData'
 
@@ -140,6 +148,8 @@ import { getExt, mergeUserMeta } from '@/utils/assets/getMetaData'
 const POLICY = { ...DEFAULT_POLICY }
 
 export default {
+  name: 'UploadPage',
+
   data() {
     return {
       // 업로드 상태
@@ -170,7 +180,13 @@ export default {
 
       // 필터 UI 상태
       filtersUi: {
+        /**
+         * roots: [
+         *   { _id, code, name, options: [TreeNode, ...] }
+         * ]
+         */
         roots: [],
+        // 각 필터 root.code 기준 선택값(code 또는 null)
         values: {},
         error: ''
       },
@@ -190,7 +206,8 @@ export default {
   methods: {
     /**
      * @function loadCommonCodes
-     * @description 공통코드(filters, categories)를 조회하고 카테고리 트리/필터 셀렉트 상태를 초기화한다.
+     * @description 공통코드(filters, categories)를 조회하고
+     *              카테고리 트리/필터 셀렉트 상태를 초기화한다.
      */
     async loadCommonCodes() {
       this.categoryTree.error = ''
@@ -233,8 +250,7 @@ export default {
     /**
      * @function setupFilterSelects
      * @description 필터 평면 데이터를 트리로 변환 후,
-     *              루트 개수만큼 셀렉트 박스를 만들고
-     *              각 셀렉트의 옵션 목록을 구성한다.
+     *              필터 루트 목록을 구성한다.
      */
     setupFilterSelects() {
       const rows = Array.isArray(this.commonCode.filters)
@@ -248,26 +264,19 @@ export default {
     /**
      * @function getFilterItems
      * @description v-select에 사용할 아이템 배열을 생성한다.
-     *              첫 번째 아이템은 항상 '선택'(값: null) 이다.
+     *              (공통 유틸 buildFilterSelectItems 사용)
      * @param {Object} root - 필터 루트 정보
      * @returns {Array<{text: string, value: string|null}>}
      */
     getFilterItems(root) {
-      const options = Array.isArray(root.options) ? root.options : []
-
-      const items = options.map((opt) => ({
-        text: opt.name ? `${opt.name}` : opt.code,
-        value: opt.code
-      }))
-
-      return [{ text: '선택', value: null }, ...items]
+      return buildFilterSelectItems(root)
     },
 
     /**
      * @function onCategoryActiveChange
      * @description 카테고리 트리에서 활성 노드 변경 시 호출.
      *              첫 번째 활성 노드를 찾아 선택 상태로 저장한다.
-     * @param {Array<string>} activeIds - 활성 노드의 id 배열
+     * @param {Array<string>} activeIds - 활성 노드의 _id 배열
      */
     onCategoryActiveChange(activeIds) {
       if (!Array.isArray(activeIds) || activeIds.length === 0) {
@@ -295,21 +304,21 @@ export default {
     /**
      * @function findFilterNodeInRoot
      * @description 주어진 필터 루트에서 코드값으로 하위 노드를 찾는다.
+     *              (공통 유틸 findFilterNodeInRoot 사용)
      * @param {Object} root - 필터 루트 정보
      * @param {string} code - 찾을 노드 code
      * @returns {Object|null} 찾은 노드 또는 null
      */
     findFilterNodeInRoot(root, code) {
-      if (!root || !Array.isArray(root.options)) return null
-      return root.options.find((opt) => opt.code === code) || null
+      return findFilterNodeInRoot(root, code)
     },
 
     /**
-         * @function onMetaPick
-         * @description 메타데이터 파일 선택 시 상태를 갱신하고 확장자를 검증한다.
-         *              - json 파일만 허용한다.
-         * @param {Event} e - input change 이벤트
-         */
+     * @function onMetaPick
+     * @description 메타데이터 파일 선택 시 상태를 갱신하고 확장자를 검증한다.
+     *              - json 파일만 허용한다.
+     * @param {Event} e - input change 이벤트
+     */
     onMetaPick(e) {
       this.meta.error = ''
       const f = e.target.files && e.target.files[0]
@@ -329,12 +338,12 @@ export default {
     },
 
     /**
-     * @function mergeMetaData
+     * @function buildMergeUserMeta
      * @description 현재 선택된 카테고리 및 필터값을 검증하고,
-     *              모두 선택된 경우 mergeUserMeta를 호출해 mergeObj를 만들어
-     *              콘솔에 출력한다.
+     *              모두 선택된 경우 mergeUserMeta를 호출해 mergeObj를 생성한다.
+     * @returns {Promise<Object|null>} mergeObj 또는 null
      */
-    async mergeMetaData() {
+    async buildMergeUserMeta() {
       this.filtersUi.error = ''
 
       const category = this.selectedCategory
@@ -344,51 +353,37 @@ export default {
 
       if (!category || missingFilterRoots.length > 0) {
         this.filtersUi.error =
-          '카테고리와 모든 필터를 선택한 후 테스트 버튼을 눌러주세요.'
-        return
+          '카테고리와 모든 필터를 선택한 후 테스트/업로드 버튼을 눌러주세요.'
+        return null
       }
 
-      // 필터 선택 결과 구성(디버그용)
-      const filterSelections = this.filtersUi.roots.map((root) => {
-        const value = this.filtersUi.values[root.code]
-        const node = this.findFilterNodeInRoot(root, value)
+      const filterCodes = this.filtersUi.roots.map(
+        root => this.filtersUi.values[root.code] || ''
+      )
 
-        return {
-          groupCode: root.code,
-          groupName: root.name,
-          value,
-          node
-        }
-      })
-
-      // eslint-disable-next-line no-console
-      console.log('[TEST] category:', category)
-      // eslint-disable-next-line no-console
-      console.log('[TEST] filters:', filterSelections)
-
-      // 커밋용 mergeObj 생성에 사용할 필터 코드 배열
-      const filterCodes = filterSelections.map(fs => fs.value || '')
-
-      // 🔥 유틸 함수로 분리된 mergeUserMeta 호출
       const mergedObj = await mergeUserMeta(this.meta.file, {
         categoryCode: category.code || '',
         filterCodes
       })
 
-      // ✅ 최종 병합 결과 JSON 출력
-      // (향후 업로드 커밋 시 body에 그대로 실어 보내면 됨)
-      // eslint-disable-next-line no-console
-      // console.log(
-      //   '[TEST] merged userData meta JSON:',
-      //   JSON.stringify(mergedObj, null, 2)
-      // )
+      return mergedObj
+    },
 
-      return mergedObj;
+    /**
+     * @function onTestMerge
+     * @description 테스트 버튼 클릭 시 mergeUserMeta 결과를 콘솔에 출력한다.
+     */
+    async onTestMerge() {
+      const mergedObj = await this.buildMergeUserMeta()
+      if (!mergedObj) return
+
+      // eslint-disable-next-line no-console
+      console.log('[TEST] merged userData meta:', mergedObj)
     },
 
     /**
      * @function onPick
-     * @description 파일 선택 시 상태 초기화 및 선택 파일 보관
+     * @description 3D 파일 선택 시 상태 초기화 및 선택 파일 보관
      * @param {Event} e - input change 이벤트
      */
     onPick(e) {
@@ -400,8 +395,9 @@ export default {
 
     /**
      * @function onUpload
-     * @description 업로드 버튼 클릭 시 presign → PUT 업로드 실행
-     *              (향후 커밋 요청 시 mergeUserMeta 결과를 body에 함께 실어 보낼 수 있다)
+     * @description 업로드 버튼 클릭 시
+     *              - 메타데이터/카테고리/필터를 mergeUserMeta로 병합
+     *              - presign → PUT 업로드 실행
      */
     async onUpload() {
       if (!this.state.file || this.state.loading) return
@@ -412,35 +408,17 @@ export default {
 
       const ok = await this.$err.guard(
         async () => {
-          // TODO: 커밋 시점에 mergeUserMeta 결과를 body에 포함시키고 싶다면,
-          // 아래와 같이 category/filter 선택 상태를 이용해 mergeObj를 만들 수 있다.
-          //
-          // const category = this.selectedCategory
-          // const filterSelections = this.filtersUi.roots.map((root) => {
-          //   const value = this.filtersUi.values[root.code]
-          //   return { value }
-          // })
-          // const filterCodes = filterSelections.map(fs => fs.value || '')
-          // const mergeObj = await mergeUserMeta(this.meta.file, {
-          //   categoryCode: category?.code || '',
-          //   filterCodes
-          // })
-          //
-          // 그런 다음 upload3DModel 호출 시 body 또는 meta로 전달:
-          // const { meta } = await upload3DModel({
-          //   file: this.state.file,
-          //   api: this.$api,
-          //   policy: POLICY,
-          //   userMeta: mergeObj
-          // })
-
-          const userMeta = await this.mergeMetaData();
+          const userMeta = await this.buildMergeUserMeta()
+          if (!userMeta) {
+            // 선택 검증 실패 시 업로드 중단
+            return false
+          }
 
           const { meta } = await upload3DModel({
             file: this.state.file,
             api: this.$api,
             policy: POLICY,
-            userMeta: userMeta
+            userMeta
           })
           this.state.meta = meta
           this.state.done = true
@@ -451,7 +429,9 @@ export default {
       )
 
       if (!ok) {
-        this.state.error = '업로드 중 오류가 발생했습니다.'
+        if (!this.state.error) {
+          this.state.error = '업로드 중 오류가 발생했습니다.'
+        }
       }
 
       this.state.loading = false

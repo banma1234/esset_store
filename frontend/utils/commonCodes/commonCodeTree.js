@@ -1,4 +1,4 @@
-// /utils/commonCodeTree.js
+// /utils/commonCodes/commonCodeTree.js
 import { buildTree } from "./buildTree";
 
 /**
@@ -25,6 +25,7 @@ import { buildTree } from "./buildTree";
 
 /**
  * @typedef {Object} FilterRoot
+ * @property {string} _id
  * @property {string} code                - 필터 루트 코드
  * @property {string} name                - 필터 루트 이름
  * @property {Array<TreeNode>} options    - 루트 기준 모든 하위 노드 목록
@@ -42,9 +43,9 @@ export function buildCategoryTree(rows = []) {
 
 /**
  * @function findTreeNodeById
- * @description v-treeview용 트리에서 id로 노드를 찾는다(BFS).
+ * @description v-treeview용 트리에서 _id로 노드를 찾는다(BFS).
  * @param {Array<TreeNode>} items - 트리 루트 노드 배열
- * @param {string} id - 찾을 노드 id
+ * @param {string} id - 찾을 노드 _id
  * @returns {TreeNode|null} 찾은 노드 또는 null
  */
 export function findTreeNodeById(items = [], id) {
@@ -63,9 +64,10 @@ export function findTreeNodeById(items = [], id) {
 
 /**
  * @function buildFilterRoots
- * @description 필터 공통코드 평면 배열을 v-select 그룹 정보로 변환한다.
- *              - "필터 옵션" 노드 개수만큼 셀렉트 박스를 만든다.
- *              - 각 셀렉트 박스의 옵션은 해당 노드의 모든 하위 노드(자식/손자 포함)이다.
+ * @description
+ *  필터 공통코드 평면 배열을 v-select 그룹 정보로 변환한다.
+ *  - "필터 옵션" 노드 개수만큼 셀렉트 박스를 만든다.
+ *  - 각 셀렉트 박스의 옵션은 해당 노드의 모든 하위 노드(자식/손자 포함)이다.
  * @param {Array<CommonCodeRow>} rows - 공통코드 행 배열
  * @returns {Array<FilterRoot>} 필터 루트(= 필터 옵션 노드) 목록
  */
@@ -114,4 +116,43 @@ export function flattenChildren(root) {
   }
 
   return out;
+}
+
+/**
+ * @typedef {Object} FilterSelectItem
+ * @property {string} text   - 셀렉트에 표시할 텍스트
+ * @property {string|null} value - 선택 값(코드) 또는 null
+ */
+
+/**
+ * @function buildFilterSelectItems
+ * @description
+ *  v-select에서 사용할 아이템 배열을 생성한다.
+ *  - 첫 번째 아이템은 항상 '선택'(값: null) 이다.
+ *  - 나머지는 해당 필터 루트의 options를 기반으로 생성한다.
+ * @param {FilterRoot} root - 필터 루트 정보
+ * @returns {Array<FilterSelectItem>} v-select용 아이템 리스트
+ */
+export function buildFilterSelectItems(root) {
+  const options = Array.isArray(root.options) ? root.options : [];
+
+  const items = options.map((opt) => ({
+    text: opt.name ? `${opt.name}` : opt.code,
+    value: opt.code,
+  }));
+
+  return [{ text: "선택", value: null }, ...items];
+}
+
+/**
+ * @function findFilterNodeInRoot
+ * @description
+ *  주어진 필터 루트의 options에서 code로 노드를 찾는다.
+ * @param {FilterRoot} root - 필터 루트 정보
+ * @param {string} code - 찾을 노드 code
+ * @returns {TreeNode|null} 찾은 노드 또는 null
+ */
+export function findFilterNodeInRoot(root, code) {
+  if (!root || !Array.isArray(root.options)) return null;
+  return root.options.find((opt) => opt.code === code) || null;
 }
