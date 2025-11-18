@@ -16,7 +16,7 @@
       <div class="d-flex align-center">
         <!-- 검색바 -->
         <v-text-field v-model="search" hide-details dense solo-inverted flat prepend-inner-icon="mdi-magnify"
-          placeholder="검색" class="mr-2" @keyup.enter="onSearch" />
+          placeholder="파일명 검색" class="mr-2" @keyup.enter="onSearch" />
 
         <!-- 에셋 추가 버튼: /upload -->
         <v-btn color="primary" class="mr-2" @click="goUpload">
@@ -70,12 +70,26 @@ export default {
 
     /**
      * @function onSearch
-     * @description 검색 엔터 입력 시 동작 (현재는 콘솔 출력만 수행)
+     * @description
+     *  - 검색어 입력 후 Enter 시 호출된다.
+     *  - 메인 페이지(/)로 이동하면서 쿼리스트링에 filename을 전달한다.
+     *  - 검색어가 비어 있으면 전체 목록을 보기 위해 쿼리 없이 / 만 호출한다.
      */
     onSearch() {
-      // TODO: 실제 검색 로직 연결 예정
-      // eslint-disable-next-line no-console
-      console.log('[Header search]', this.search)
+      const keyword = (this.search || '').trim()
+
+      if (!keyword) {
+        // 검색어가 없으면 전체 목록
+        this.$router.push({ path: '/' })
+        return
+      }
+
+      this.$router.push({
+        path: '/',
+        query: {
+          filename: keyword
+        }
+      })
     }
   }
 }
