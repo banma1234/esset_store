@@ -7,7 +7,7 @@ const commonCodeRoutes = require('./routes/commonCode.routes');
 const presignedRoutes = require('./routes/presigned.routes');
 const commitRoutes = require('./routes/commit.routes');
 const logRoutes = require('./routes/logs.routes');
-
+const assetsSearchRoutes = require('./routes/assets.routes');
 const test2Routes = require('./routes/test2.routes');
 
 const { logger } = require('./utils/logers');
@@ -36,6 +36,7 @@ app.use(commonCodeRoutes);
 app.use(presignedRoutes);
 app.use(commitRoutes);
 app.use(logRoutes);
+app.use(assetsSearchRoutes);
 app.use(requestContext());
 app.use(requestLogger());
 app.use(errorHandler);

@@ -7,6 +7,7 @@ const {
 } = require('@aws-sdk/client-s3');
 const { createS3Client } = require('../../utils/s3');
 const { handleLogEvent } = require('../../utils/logEventHandler');
+const Asset = require('../../models/assets/Assets.model');
 const { AppError } = require('../../errors/appError');
 
 const s3 = createS3Client();
@@ -57,7 +58,7 @@ async function getSafeObjectBuffer(key) {
   return Buffer.concat(chunks);
 }
 
-async function deleteObject(key) {
+async function deleteObjectSafely(key) {
   await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key }));
 }
 
@@ -88,7 +89,7 @@ async function promoteStagingToFinal(body) {
   const finalKey = key.replace(/\/staging\//, '/final/');
 
   await copyObject(key, finalKey);
-  await deleteObject(key);
+  await deleteObjectSafely(key);
 
   return { ...body, key: finalKey };
 }
@@ -155,4 +156,86 @@ async function saveSafeModel(payload) {
   return { ok: true };
 }
 
-module.exports = { checkMetaCorrect, getSafeObjectBuffer, promoteStagingToFinal, getMetaData, saveSafeModel };
+/**
+ * @function getAssetsBySearchOptions
+ * @description 카테고리 + 필터 + 페이지네이션을 적용하여 에셋을 검색한다.
+ * @param {AssetSearchOptions} options 검색 옵션
+ * @returns {Promise<{
+ *   items: object[],
+ *   pagination: {
+ *     page: number,
+ *     pageSize: number,
+ *     totalItems: number,
+ *     totalPages: number,
+ *     hasNextPage: boolean,
+ *     hasPrevPage: boolean
+ *   }
+ * }>}
+ */
+async function getAssetsBySearchOptions(options) {
+  if (!options) {
+    throw new AppError('검색 옵션이 전달되지 않았습니다.', 400, 'INVALID_OPTIONS');
+  }
+
+  const { category, filters, page, filename } = options;
+  const PAGE_SIZE = 4;
+
+  let pageNum = parseInt(page, 10);
+  if (!Number.isFinite(pageNum) || pageNum < 1) {
+    pageNum = 1;
+  }
+
+  const limit = PAGE_SIZE;
+  const skip = (pageNum - 1) * limit;
+  const query = { deletedAt: null, isActive: true };
+  const filterCodes =
+    filters.length > 0
+      ? filters
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean)
+      : [];
+
+  if (filename.length > 0) {
+    query.fileName = new RegExp(filename.trim(), 'i');
+  } else {
+    if (category) {
+      query.category = new RegExp(`^${category}`);
+    }
+    if (filterCodes.length > 0) {
+      query.filters = { $all: filterCodes };
+    }
+  }
+
+  const [items, totalItems] = await Promise.all([
+    Asset.find(query)
+      .sort({ updatedAt: -1 }) // 인덱스 { category, filters, updatedAt: -1 } 활용
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Asset.countDocuments(query),
+  ]);
+
+  const totalPages = totalItems === 0 ? 1 : Math.ceil(totalItems / limit);
+
+  return {
+    items,
+    pagination: {
+      page: pageNum,
+      pageSize: limit,
+      totalItems,
+      totalPages,
+      hasNextPage: pageNum < totalPages,
+      hasPrevPage: pageNum > 1,
+    },
+  };
+}
+
+module.exports = {
+  checkMetaCorrect,
+  getSafeObjectBuffer,
+  promoteStagingToFinal,
+  getMetaData,
+  saveSafeModel,
+  getAssetsBySearchOptions,
+};
