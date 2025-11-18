@@ -13,8 +13,8 @@ const { Schema } = mongoose;
  * @property {string} fileType 파일 형식 (예: "gltf", "stl")
  * @property {number} sizeBytes 파일 크기(바이트)
  * @property {string} thumbnail 썸네일
- * @property {Object} category 카테고리 정보 객체
- * @property {Object[]} filters 필터 정보 배열
+ * @property {string} category 카테고리 정보 객체
+ * @property {string[]} filters 필터 정보 배열
  * @property {LatestVersionInfo} latestVersion 최신 버전 정보
  * @property {Date} updatedAt 최근 갱신 시각
  * @property {Date|null} deletedAt 삭제 시각(소프트 삭제용, 미삭제 시 null)
@@ -45,13 +45,13 @@ const assetSchema = new Schema({
 
   /** 카테고리 정보 객체 */
   category: {
-    type: Schema.Types.Mixed,
-    default: null,
+    type: String,
+    default: undefined,
   },
 
   /** 필터 정보 배열 */
   filters: {
-    type: [Schema.Types.Mixed],
+    type: [String],
     default: [],
   },
 
@@ -80,8 +80,9 @@ const assetSchema = new Schema({
   },
 });
 
-// 필요 시 인덱스 추가 예시
-// assetSchema.index({ fileName: 1 });
+// 인덱스 생성
+assetSchema.index({ fileName: 1 }, { unique: true });
+assetSchema.index({ category: 1, filters: 1, updatedAt: -1 });
 
 const AssetModel = mongoose.model('Asset', assetSchema);
 
