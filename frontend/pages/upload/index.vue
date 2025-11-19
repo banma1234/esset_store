@@ -76,7 +76,7 @@
               </template>
             </div>
 
-            <div style="max-height: 260px; overflow: auto;">
+            <div style="max-height: 300px; overflow: auto;">
               <v-alert v-if="categoryTree.error" type="error" dense outlined class="mb-2">
                 {{ categoryTree.error }}
               </v-alert>
@@ -119,14 +119,6 @@
             </v-col>
           </v-row>
 
-          <!-- ===================== -->
-          <!-- 테스트 버튼            -->
-          <!-- ===================== -->
-          <div class="mt-4">
-            <v-btn color="secondary" @click="onTestMerge">
-              테스트
-            </v-btn>
-          </div>
         </v-card>
       </v-col>
     </v-row>
@@ -367,18 +359,6 @@ export default {
       })
 
       return mergedObj
-    },
-
-    /**
-     * @function onTestMerge
-     * @description 테스트 버튼 클릭 시 mergeUserMeta 결과를 콘솔에 출력한다.
-     */
-    async onTestMerge() {
-      const mergedObj = await this.buildMergeUserMeta()
-      if (!mergedObj) return
-
-      // eslint-disable-next-line no-console
-      console.log('[TEST] merged userData meta:', mergedObj)
     },
 
     /**
