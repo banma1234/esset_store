@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAssetsBySearchOptions } = require('../services/assets/assets.service');
+const { getAssetsBySearchOptions, getAssetByFileName } = require('../services/assets/assets.service');
 
 /**
  * @route GET /api/v1/assets/search
@@ -12,7 +12,17 @@ const { getAssetsBySearchOptions } = require('../services/assets/assets.service'
 router.get('/api/v1/assets/search', async (req, res, next) => {
   try {
     const result = await getAssetsBySearchOptions(req.query);
-    res.json(result);
+
+    return res.status(200).json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/api/v1/assets', async (req, res, next) => {
+  try {
+    const result = await getAssetByFileName(req.query);
+    res.status(200).json({ ok: true, data: result });
   } catch (err) {
     next(err);
   }

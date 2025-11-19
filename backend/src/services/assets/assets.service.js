@@ -118,7 +118,7 @@ async function saveSafeModel(payload) {
   try {
     json = JSON.parse(gltfJsonStr);
   } catch {
-    throw new AppError('gltf의 JSON 파싱에 실패했습니다.', 433, 'FAILED_GLTF_JSON');
+    throw new AppError('gltf의 JSON 파싱에 실패했습니다.', 422, 'GLTF_JSON_FAILED');
   }
 
   // 2) 문자열화(미니파이 기본)
@@ -156,6 +156,16 @@ async function saveSafeModel(payload) {
   return { ok: true };
 }
 
+async function getAssetByFileName(payload) {
+  const { filename } = payload;
+
+  try {
+    return Asset.findOne({ fileName: filename }).lean();
+  } catch (err) {
+    throw new AppError('에셋을 불러오는데 실패했습니다.', 422, 'ASSET_FAILED');
+  }
+}
+
 /**
  * @function getAssetsBySearchOptions
  * @description 카테고리 + 필터 + 페이지네이션을 적용하여 에셋을 검색한다.
@@ -174,7 +184,7 @@ async function saveSafeModel(payload) {
  */
 async function getAssetsBySearchOptions(options) {
   if (!options) {
-    throw new AppError('검색 옵션이 전달되지 않았습니다.', 400, 'INVALID_OPTIONS');
+    throw new AppError('검색 옵션이 전달되지 않았습니다.', 422, 'INVALID_OPTIONS');
   }
 
   const { category, filters, page, filename } = options;
@@ -237,5 +247,6 @@ module.exports = {
   promoteStagingToFinal,
   getMetaData,
   saveSafeModel,
+  getAssetByFileName,
   getAssetsBySearchOptions,
 };
