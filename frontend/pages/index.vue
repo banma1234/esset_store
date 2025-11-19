@@ -91,12 +91,14 @@ export default {
   computed: {
     /**
      * @function currentFilename
-     * @description
-     *  - 현재 라우트의 쿼리스트링에서 filename을 읽어온다.
-     *  - 없으면 빈 문자열을 반환한다.
+     * @description 쿼리 스트링에서 검색조건 읽어오기.
      */
-    currentFilename() {
-      return this.$route.query.filename || ''
+    currentQueryString() {
+      const filename = this.$route.query.filename || ''
+      const category = this.$route.query.category || ''
+      const filters = this.$route.query.filters || ''
+
+      return { filename, category, filters }
     }
   },
 
@@ -107,11 +109,9 @@ export default {
   watch: {
     /**
      * @function currentFilename
-     * @description
-     *  - 헤더 검색 등으로 filename 쿼리가 바뀌면
-     *    1페이지부터 다시 에셋 목록을 로드한다.
+     * @description 페이지 전달(검색은 무조건 1페이지) 및 에셋 불러오기
      */
-    currentFilename() {
+    currentQueryString() {
       this.assets.pagination.page = 1
       this.loadAssets(1)
     }
@@ -120,26 +120,23 @@ export default {
   methods: {
     /**
      * @function loadAssets
-     * @description
-     *  - 에셋 목록을 조회한다.
-     *  - 검색어는 currentFilename(쿼리스트링 filename)을 사용한다.
-     *  - GET /api/v1/assets/search?category=&filters=&page=&filename=
+     * @description 에셋 목록을 조회.
      * @param {number} page - 조회할 페이지 번호
      */
     async loadAssets(page = 1) {
       this.assets.loading = true
       this.assets.error = ''
 
-      const filename = this.currentFilename
+      const { filename, category, filters } = this.currentQueryString
 
       const ok = await this.$err.guard(
         async () => {
-          const data = await this.$api.get('/assets/search', {
+          const { data } = await this.$api.get('/assets/search', {
             query: {
-              category: '',
-              filters: '',
+              category: category,
+              filters: filters,
+              filename: filename,
               page,
-              filename
             }
           })
 
@@ -167,22 +164,31 @@ export default {
 
     /**
      * @function onPageChange
-     * @description v-pagination에서 페이지 변경 시 호출된다.
+     * @description v-pagination에서 페이지 변경 시 호출.
      * @param {number} page - 변경된 페이지 번호
      */
     async onPageChange(page) {
-      if (this.assets.loading) return
+      if (this.assets.loading) {
+        return
+      }
+
       this.assets.pagination.page = page
       await this.loadAssets(page)
     },
 
     formattedUpdatedAt(value) {
-      if (!value) return ''
+      if (!value) {
+        return ''
+      }
+
       return formatDate(value)
     },
 
     goDetail(item) {
-      if (!item || !item.fileName) return
+      if (!item || !item.fileName) {
+        return
+      }
+
       this.$router.push(`/assets/${item.fileName}`)
     }
   }

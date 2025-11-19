@@ -7,15 +7,12 @@
         <v-divider />
 
         <v-card-text class="tw-py-3 tw-space-y-4">
-            <!-- ===================== -->
-            <!-- 카테고리 트리          -->
-            <!-- ===================== -->
+
+            <!-- 카테고리 -->
             <section>
                 <div class="tw-text-xs tw-font-medium tw-mb-1.5">
                     카테고리
                 </div>
-
-                <!-- 선택된 카테고리 표시 -->
                 <div v-if="selectedCategory" class="tw-text-xs tw-mb-1">
                     <strong>선택:</strong>
                     {{ selectedCategory.name }}
@@ -30,27 +27,19 @@
                     {{ categoryTree.error }}
                 </v-alert>
 
-                <div v-else style="max-height: 260px; overflow: auto;">
+                <div v-else style="max-height: 500px; overflow: auto;">
                     <v-treeview :items="categoryTree.items" :open.sync="categoryTree.open"
                         :active.sync="categoryTree.active" item-key="_id" item-children="children" activatable
                         open-on-click dense transition @update:active="onCategoryActiveChange">
                         <template #label="{ item }">
-                            <span>
-                                {{ item.name }}
-                                <template v-if="item.depth > 0 && item.code">
-                                    <small class="grey--text">
-                                        ({{ item.code }})
-                                    </small>
-                                </template>
+                            <span>{{ item.name }}
                             </span>
                         </template>
                     </v-treeview>
                 </div>
             </section>
 
-            <!-- ===================== -->
-            <!-- 필터 셀렉트 박스들     -->
-            <!-- ===================== -->
+            <!-- 필터 -->
             <section>
                 <div class="tw-text-xs tw-font-medium tw-mb-1.5">
                     필터
@@ -85,24 +74,17 @@ export default {
 
     data() {
         return {
-            // /api/v1/commonCode 응답 원본
             commonCode: {
                 filters: [],
                 categories: []
             },
-
-            // 카테고리 트리 상태
             categoryTree: {
                 items: [],
                 open: [],
                 active: [],
                 error: ''
             },
-
-            // 선택된 카테고리 노드
             selectedCategory: null,
-
-            // 필터 UI 상태
             filtersUi: {
                 roots: [],
                 values: {},
@@ -118,8 +100,7 @@ export default {
     methods: {
         /**
          * @function loadCommonCodes
-         * @description 공통코드(filters, categories)를 조회하고
-         *              카테고리 트리/필터 셀렉트 상태를 초기화한다.
+         * @description 공통코드(filters, categories)를 조회 후 트리/필터 상태 초기화
          */
         async loadCommonCodes() {
             this.categoryTree.error = ''
@@ -146,7 +127,7 @@ export default {
 
         /**
          * @function setupCategoryTree
-         * @description 카테고리 평면 데이터를 트리 구조로 변환해 v-treeview에 바인딩한다.
+         * @description 카테고리 평면 데이터를 트리뷰용 구조로 변환
          */
         setupCategoryTree() {
             const rows = Array.isArray(this.commonCode.categories)
@@ -161,7 +142,7 @@ export default {
 
         /**
          * @function setupFilterSelects
-         * @description 필터 평면 데이터를 필터 루트 목록으로 변환한다.
+         * @description 필터 평면 데이터를 필터 루트 목록으로 변환
          */
         setupFilterSelects() {
             const rows = Array.isArray(this.commonCode.filters)
@@ -174,8 +155,7 @@ export default {
 
         /**
          * @function getFilterItems
-         * @description 공통 유틸(buildFilterSelectItems)을 사용해 v-select 아이템 배열을 반환한다.
-         * @param {Object} root - 필터 루트 정보
+         * @description 공통 유틸을 사용해 v-select 아이템 리스트 생성
          */
         getFilterItems(root) {
             return buildFilterSelectItems(root)
@@ -183,12 +163,13 @@ export default {
 
         /**
          * @function onCategoryActiveChange
-         * @description 카테고리 트리에서 활성 노드 변경 시 호출.
-         * @param {Array<string>} activeIds - 활성 노드의 _id 배열
+         * @description 카테고리 트리 선택 변경 시 선택 노드 갱신 + 검색 쿼리 업데이트
+         * @param {Array<string>} activeIds - 활성 노드 _id 배열
          */
         onCategoryActiveChange(activeIds) {
             if (!Array.isArray(activeIds) || activeIds.length === 0) {
                 this.selectedCategory = null
+                this.updateAssetSearchQuery()
                 return
             }
 
@@ -196,16 +177,48 @@ export default {
             const node = findTreeNodeById(this.categoryTree.items, id)
 
             this.selectedCategory = node || null
+            this.updateAssetSearchQuery()
         },
 
         /**
          * @function onFilterChange
-         * @description 특정 필터 셀렉트 값 변경 시 호출.
+         * @description 필터 셀렉트 값 변경 시 선택값 갱신 + 검색 쿼리 업데이트
          * @param {Object} root - 필터 루트 정보
          * @param {string|null} value - 선택된 코드값 또는 null
          */
         onFilterChange(root, value) {
             this.$set(this.filtersUi.values, root.code, value || null)
+            this.updateAssetSearchQuery()
+        },
+
+        /**
+         * @function updateAssetSearchQuery
+         * @description
+         *  현재 선택된 카테고리/필터 값을 기준으로
+         *  라우터 쿼리(category, filters)를 갱신한다.
+         *  - 메인페이지 index.vue 에서 이 쿼리를 감지해 /assets/search 를 다시 호출한다.
+         */
+        updateAssetSearchQuery() {
+            // 카테고리 코드 (없으면 빈 문자열)
+            const categoryCode = this.selectedCategory?.code || ''
+
+            // 선택된 필터 코드들만 추출 후 ',' 로 join
+            const selectedFilterCodes = Object.values(this.filtersUi.values)
+                .filter(Boolean) // null / '' 제거
+            const filtersStr = selectedFilterCodes.join(',')
+
+            const currentQuery = this.$route.query || {}
+
+            this.$router.push({
+                path: '/',
+                query: {
+                    // 기존 쿼리는 유지하되, category/filters/page만 덮어쓴다.
+                    ...currentQuery,
+                    category: categoryCode,
+                    filters: filtersStr,
+                    page: 1 // 필터/카테고리 바뀌면 항상 1페이지부터
+                }
+            })
         }
     }
 }
