@@ -216,38 +216,22 @@ export default {
       this.state.codeNames = {}
 
       const ok = await this.$err.guard(
-        async () => {
-          const data = await this.$api.get('/assets/search', {
-            query: {
-              category: '',
-              filters: '',
-              page: 1,
-              filename: fileName
-            }
+        async ({ error }) => {
+          const { data } = await this.$api.get('/assets', {
+            query: { filename: fileName }
           })
 
-          const items = Array.isArray(data.items) ? data.items : []
-
-          // fileName이 정확히 일치하는 항목 우선, 없으면 첫 번째 항목
-          const asset =
-            items.find(it => it.fileName === fileName) ||
-            items[0] ||
-            null
-
-          if (
-            !asset ||
-            !asset.latestVersion ||
-            !asset.latestVersion.url
-          ) {
-            throw new Error('모델 URL을 찾을 수 없습니다.')
+          if (!data || !data.latestVersion.url) {
+            return error({
+              statusCode: 404,
+              message: '해당 모델을 찾을 수 없습니다.'
+            })
           }
 
-          this.state.asset = asset
-          // 서버에서 내려준 URL을 그대로 사용
-          this.state.modelUrl = asset.latestVersion.url
+          this.state.asset = data
+          this.state.modelUrl = data.latestVersion.url
 
-          // 카테고리/필터 코드 이름 로드
-          await this.loadCodeNames(asset)
+          await this.loadCodeNames(data)
 
           return true
         },
