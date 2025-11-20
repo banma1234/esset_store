@@ -164,8 +164,200 @@ async function writeAssetSnapshot(payload) {
   }
 }
 
+/**
+ * @typedef {Object} VersionFile
+ * @property {number} version        - 버전 번호
+ * @property {string} fileType       - 파일 형식
+ * @property {number} [sizeBytes]    - 파일 크기(바이트)
+ * @property {string} [cdnUrl]       - CDN URL
+ * @property {string} [thumbCdnUrl]  - 썸네일 CDN URL
+ * @property {Date} [uploadedAt]     - 업로드 시각
+ *
+ * @typedef {Object} VersionGroup
+ * @property {mongoose.Types.ObjectId} assetId - 에셋 ID
+ * @property {string} fileName                 - 파일명(assetVersions.fileName)
+ * @property {VersionFile[]} files             - 버전별 파일 목록(버전 내림차순)
+ */
+
+/**
+ * @function getAssetVersionGroups
+ * @description assetVersions를 assetId로 그룹화하여 반환한다.
+ * @param {Object} [opts]
+ * @param {string|string[]} [opts.assetIds]   - 특정 에셋만 필터(선택)
+ * @param {string|string[]} [opts.fileTypes]  - 파일 형식 필터(선택)
+ * @param {boolean} [opts.excludeDeleted=true] - deletedAt != null 문서 제외 여부
+ * @returns {Promise<VersionGroup[]>}
+ */
+async function getAssetVersionGroups(opts = {}) {
+  const { assetIds, fileTypes, excludeDeleted = true } = opts;
+
+  /** @type {any[]} */
+  const pipeline = [];
+
+  // 1) 사전 필터
+  const match = {};
+  if (excludeDeleted) {
+    match.deletedAt = null;
+  }
+  if (assetIds) {
+    const ids = Array.isArray(assetIds) ? assetIds : [assetIds];
+    match.assetId = { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) };
+  }
+  if (fileTypes) {
+    const types = Array.isArray(fileTypes) ? fileTypes : [fileTypes];
+    match.fileType = { $in: types };
+  }
+  if (Object.keys(match).length) pipeline.push({ $match: match });
+
+  // 2) 그룹 내 정렬(버전 내림차순) → 이후 $group의 $push 순서가 이 정렬을 따라감
+  pipeline.push({ $sort: { assetId: 1, version: -1 } });
+
+  // 3) assetId 기준 그룹화, fileName은 동일하므로 $first로 대표값 사용
+  pipeline.push({
+    $group: {
+      _id: '$assetId',
+      fileName: { $first: '$fileName' }, // ← assetVersions.fileName 사용
+      files: {
+        $push: {
+          version: '$version',
+          fileType: '$fileType',
+          sizeBytes: '$sizeBytes',
+          url: '$url',
+          thumbnail: '$thumbnail',
+          updatedAt: '$updatedAt',
+        },
+      },
+    },
+  });
+
+  // 4) 출력 형태 정리 및 정렬(선택)
+  pipeline.push(
+    {
+      $project: {
+        _id: 0,
+        assetId: '$_id',
+        fileName: 1,
+        files: 1,
+      },
+    },
+    { $sort: { fileName: 1 } }, // 보기 좋은 정렬(선택)
+  );
+
+  return AssetVersions.aggregate(pipeline).allowDiskUse(true);
+}
+
+/**
+ * @typedef {Object} AssetEventSearchOptions
+ * @property {string} [eventType] 이벤트 타입 (CREATE/UPDATE/DELETE)
+ * @property {string} [startDate] 시작 날짜(포함, ISO 문자열: '2025-05-01' 등)
+ * @property {string} [endDate] 종료 날짜(포함, ISO 문자열: '2025-07-31' 등)
+ * @property {string|number} [page] 페이지 번호 (1부터 시작, 기본값 1)
+ * @property {string|number} [pageSize] 페이지당 최대 개수 (기본값 20)
+ */
+
+/**
+ * @function searchAssetEvents
+ * @description AssetEvents 컬렉션에서 eventType / 날짜 범위 / 페이지네이션을 적용해 조회한다.
+ * @param {AssetEventSearchOptions} options 검색 옵션 (req.query 그대로 넘겨도 됨)
+ * @returns {Promise<{
+ *   items: object[],
+ *   pagination: {
+ *     page: number,
+ *     pageSize: number,
+ *     totalItems: number,
+ *     totalPages: number,
+ *     hasNextPage: boolean,
+ *     hasPrevPage: boolean
+ *   }
+ * }>}
+ */
+async function searchAssetEvents(options = {}) {
+  const { eventType, startDate, endDate, page, pageSize } = options;
+
+  // ==========================
+  // 1) 페이지네이션 파라미터 처리
+  // ==========================
+  const DEFAULT_PAGE_SIZE = 20;
+  const MAX_PAGE_SIZE = 100;
+
+  let pageNum = parseInt(page, 10);
+  if (!Number.isFinite(pageNum) || pageNum < 1) {
+    pageNum = 1;
+  }
+
+  let limit = parseInt(pageSize, 10);
+  if (!Number.isFinite(limit) || limit <= 0) {
+    limit = DEFAULT_PAGE_SIZE;
+  }
+  if (limit > MAX_PAGE_SIZE) {
+    limit = MAX_PAGE_SIZE;
+  }
+
+  const skip = (pageNum - 1) * limit;
+
+  // ==========================
+  // 2) 검색 조건(query) 구성
+  // ==========================
+  /** @type {Record<string, any>} */
+  const query = {};
+
+  // 이벤트 타입 필터 (CREATE/UPDATE/DELETE)
+  if (typeof eventType === 'string' && eventType.trim() !== '') {
+    query.eventType = eventType.trim();
+  }
+
+  // 날짜 범위 필터 (updatedAt 기준)
+  const hasStart = typeof startDate === 'string' && startDate.trim() !== '';
+  const hasEnd = typeof endDate === 'string' && endDate.trim() !== '';
+
+  if (hasStart || hasEnd) {
+    /** @type {{ $gte?: Date, $lte?: Date }} */
+    const dateCond = {};
+
+    if (hasStart) {
+      // 시작일(포함)
+      dateCond.$gte = new Date(startDate);
+    }
+
+    if (hasEnd) {
+      // 종료일(포함) – 날짜만 들어온다고 가정하고, 그대로 <= 비교
+      dateCond.$lte = new Date(endDate);
+    }
+
+    query.updatedAt = dateCond;
+  }
+
+  // ==========================
+  // 3) 조회 + 전체 개수 계산
+  // ==========================
+  const [items, totalItems] = await Promise.all([
+    AssetEvent.find(query)
+      .sort({ updatedAt: -1 }) // 최신 이벤트 먼저
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    AssetEvent.countDocuments(query),
+  ]);
+
+  const totalPages = totalItems === 0 ? 1 : Math.ceil(totalItems / limit);
+
+  return {
+    items,
+    pagination: {
+      page: pageNum,
+      pageSize: limit,
+      totalItems,
+      totalPages,
+      hasNextPage: pageNum < totalPages,
+      hasPrevPage: pageNum > 1,
+    },
+  };
+}
+
 module.exports = {
   writeDownloadLog,
   writeAssetEvent,
   writeAssetSnapshot,
+  getAssetVersionGroups,
+  searchAssetEvents,
 };
