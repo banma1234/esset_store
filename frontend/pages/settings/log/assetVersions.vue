@@ -18,31 +18,42 @@
                             {{ state.error }}
                         </v-alert>
 
-                        <v-treeview v-else :items="tree.items" :active.sync="tree.active" item-key="id"
-                            item-children="children" activatable open-on-click dense transition
-                            @update:active="onActiveChange">
-                            <!-- 라벨만 커스텀 -->
-                            <template #label="{ item }">
-                                <!-- 루트: 파일 이름 -->
-                                <div v-if="item.type === 'asset'" class="d-flex align-center">
-                                    <span class="font-weight-medium">
-                                        {{ item.fileName }}
-                                    </span>
-                                </div>
+                    <v-treeview
+                        v-else
+                        :items="tree.items"
+                        :active.sync="tree.active"
+                        item-key="id"
+                        item-children="children"
+                        activatable
+                        open-on-click
+                        dense
+                        transition
+                        @update:active="onActiveChange"
+                    >
+                        <template #label="{ item }">
+                            <!-- 루트: 파일 이름 -->
+                            <div v-if="item.type === 'asset'" class="d-flex align-center">
+                            <span class="font-weight-medium">
+                                {{ item.fileName }}
+                            </span>
+                            </div>
 
-                                <!-- 버전 노드 -->
-                                <div v-else-if="item.type === 'version'" class="d-flex flex-column">
-                                    <div class="d-flex align-center">
-                                        <span class="font-weight-medium">
-                                            v{{ item.version }}
-                                        </span>
-                                        <span class="grey--text text--darken-1 ml-2 text-caption">
-                                            {{ formatBytes(item.sizeBytes) }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </template>
-                        </v-treeview>
+                            <!-- 버전 노드 -->
+                            <div v-else-if="item.type === 'version'" class="d-flex flex-column">
+                            <div class="d-flex align-center">
+                                <span
+                                class="font-weight-medium"
+                                :class="{ 'red--text text--darken-2': item.isActive === false }"
+                                >
+                                v{{ item.version }}
+                                </span>
+                                <span class="grey--text text--darken-1 ml-2 text-caption">
+                                {{ formatBytes(item.sizeBytes) }}
+                                </span>
+                            </div>
+                            </div>
+                        </template>
+                    </v-treeview>
                     </v-card-text>
                 </v-card>
             </v-col>
@@ -63,7 +74,6 @@
                     <v-card-text style="height: 600px; overflow: auto;">
                         <!-- 아무 것도 선택 안 한 경우 -->
                         <div v-if="!hasActiveVersion" class="grey--text text--darken-1">
-                            좌측에서 파일의 버전 노드를 선택하면 상세 정보가 여기 표시됩니다.
                         </div>
 
                         <!-- 상세 정보 -->
@@ -136,6 +146,28 @@
                                 <v-list-item>
                                     <v-list-item-content>
                                         <v-list-item-title class="font-weight-medium">
+                                            사용 여부 (isActive)
+                                        </v-list-item-title>
+                                        <v-list-item-subtitle>
+                                            {{ detail.data.isActive }}
+                                        </v-list-item-subtitle>
+                                    </v-list-item-content>
+                                </v-list-item>
+
+                                <v-list-item>
+                                    <v-list-item-content>
+                                        <v-list-item-title class="font-weight-medium">
+                                            삭제일 (deletedAt)
+                                        </v-list-item-title>
+                                        <v-list-item-subtitle>
+                                            {{ detail.data.deletedAt }}
+                                        </v-list-item-subtitle>
+                                    </v-list-item-content>
+                                </v-list-item>
+
+                                <v-list-item>
+                                    <v-list-item-content>
+                                        <v-list-item-title class="font-weight-medium">
                                             assetId
                                         </v-list-item-title>
                                         <v-list-item-subtitle>
@@ -199,7 +231,9 @@ export default {
                     sizeBytes: 0,
                     url: '',
                     thumbnail: '',
-                    updatedAt: null
+                    updatedAt: null,
+                    isActive: true,
+                    deletedAt: null,
                 }
             }
         }
@@ -247,7 +281,9 @@ export default {
                 sizeBytes: 0,
                 url: '',
                 thumbnail: '',
-                updatedAt: null
+                updatedAt: null,
+                isActive: true,
+                deletedAt: null,
             }
 
             const ok = await this.$err.guard(
@@ -287,11 +323,19 @@ export default {
                 const fileName = asset.fileName || '(no name)'
                 const files = Array.isArray(asset.files) ? asset.files : []
 
+                // 🔹 루트(파일) 노드의 활성 여부: 있으면 그대로, 없으면 children 기준으로 유추
+                const assetIsActive =
+                asset.isActive ?
+                asset.isActivate :
+                files.some(f => (f.isActive ? f.isActivate : true) === true)
+
                 return {
                     id: assetId,
                     type: 'asset',
                     assetId,
                     fileName,
+                    // 🔹 루트에도 isActive 플래그 달아두기
+                    isActive: assetIsActive,
                     children: files.map((file, i) => ({
                         id: `${assetId}:${file.version || i}`,
                         type: 'version',
@@ -302,7 +346,10 @@ export default {
                         sizeBytes: file.sizeBytes || 0,
                         url: file.url || '',
                         thumbnail: file.thumbnail || '',
-                        updatedAt: file.updatedAt || null
+                        updatedAt: file.updatedAt || null,
+                        // 🔹 isActive / isActivate 둘 다 케어
+                        isActive: file.isActive,
+                        deletedAt: file.deletedAt || null
                     }))
                 }
             })
@@ -343,7 +390,9 @@ export default {
                     sizeBytes: 0,
                     url: '',
                     thumbnail: '',
-                    updatedAt: null
+                    updatedAt: null,
+                    isActive: true,
+                    deletedAt: null
                 }
                 return
             }
@@ -351,6 +400,8 @@ export default {
             const id = activeIds[0]
             const node = this.findNodeById(id)
             if (!node) return
+
+            console.log(node);
 
             // 버전 노드만 상세에 반영
             if (node.type === 'version') {
@@ -362,7 +413,9 @@ export default {
                     sizeBytes: node.sizeBytes || 0,
                     url: node.url || '',
                     thumbnail: node.thumbnail || '',
-                    updatedAt: node.updatedAt || null
+                    updatedAt: node.updatedAt || null,
+                    isActive: node.isActive,
+                    deletedAt: node.deletedAt || 'null'
                 }
             }
         },
