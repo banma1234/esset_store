@@ -7,11 +7,13 @@ const {
 } = require('@aws-sdk/client-s3');
 const { createS3Client } = require('../../utils/s3');
 const { handleLogEvent } = require('../../utils/logEventHandler');
-const Asset = require('../../models/assets/Assets.model');
+const { ObjectId } = require('mongodb');
 const { AppError } = require('../../errors/appError');
+const Asset = require('../../models/assets/Assets.model');
+const AssetVersions = require('../../models/assets/AssetVersions.model');
 
 const s3 = createS3Client();
-const S3_BUCKET = process.env.S3_BUCKET;
+const { CDN_BASE_URL, S3_ENDPOINT, S3_BUCKET } = process.env;
 
 async function getMetaData(key) {
   const res = await s3.send(new HeadObjectCommand({ Bucket: S3_BUCKET, Key: key }));
@@ -37,9 +39,9 @@ async function checkMetaCorrect(body) {
   if (body.sizeBytes !== contentLength) {
     throw new AppError('파일 크기가 일치하지 않습니다.', 422, 'SIZE_MISMATCH');
   }
-  if (version === body.userMeta.version) {
-    throw new AppError('기존 파일과 버전이 겹칩니다.', 422, 'VERSION_MISMATCH');
-  }
+  // if (version === body.userMeta.version) {
+  //   throw new AppError('기존 파일과 버전이 겹칩니다.', 422, 'VERSION_MISMATCH');
+  // }
 }
 
 /**
@@ -135,8 +137,6 @@ async function saveSafeModel(payload) {
     }),
   );
 
-  const { CDN_BASE_URL, S3_ENDPOINT } = process.env;
-
   handleLogEvent({
     type: 'ASSET_SNAPSHOT',
     payload: {
@@ -144,8 +144,8 @@ async function saveSafeModel(payload) {
       fileType: body.fileType,
       sizeBytes: body.sizeBytes,
       thumbnail: `${CDN_BASE_URL}${thumbKey.replace(S3_ENDPOINT, '')}`,
-      category: userMeta.userData.category,
-      filters: userMeta.userData.filters,
+      category: userMeta.esUserData.category,
+      filters: userMeta.esUserData.filters,
       latestVersion: {
         version: userMeta.version,
         url: `${CDN_BASE_URL}${key.replace(S3_ENDPOINT, '')}`,
@@ -156,14 +156,12 @@ async function saveSafeModel(payload) {
   return { ok: true };
 }
 
-async function getAssetByFileName(payload) {
-  const { filename } = payload;
-
-  try {
-    return Asset.findOne({ fileName: filename }).lean();
-  } catch (err) {
-    throw new AppError('에셋을 불러오는데 실패했습니다.', 422, 'ASSET_FAILED');
+async function getAssetByFileName(query) {
+  if (!query.filename || typeof query.filename !== 'string') {
+    throw new AppError('유효하지 않은 파일명 입니다.', 422, 'INVALID_FILENAME');
   }
+
+  return Asset.findOne({ fileName: query.filename }).lean();
 }
 
 /**
@@ -182,13 +180,13 @@ async function getAssetByFileName(payload) {
  *   }
  * }>}
  */
-async function getAssetsBySearchOptions(options) {
-  if (!options) {
-    throw new AppError('검색 옵션이 전달되지 않았습니다.', 422, 'INVALID_OPTIONS');
+async function getAssetsBySearchOptions(requestQuery) {
+  if (!requestQuery) {
+    throw new AppError('유효하지 않은 검색 옵션입니다.', 422, 'INVALID_OPTIONS');
   }
 
-  const { category, filters, page, filename } = options;
-  const PAGE_SIZE = 4;
+  const { category, filters, page, filename } = requestQuery;
+  const PAGE_SIZE = 8;
 
   let pageNum = parseInt(page, 10);
   if (!Number.isFinite(pageNum) || pageNum < 1) {
@@ -241,6 +239,75 @@ async function getAssetsBySearchOptions(options) {
   };
 }
 
+/**
+ * @function checkCDNUrlAvailable
+ * @description 주어진 URL에 HEAD 요청을 보내어 사용 가능 여부를 판정한다.
+ * @param {string} url 절대 URL (http/https)
+ * @param {number} [timeoutMs=1500] 타임아웃(ms)
+ * @returns {Promise<boolean>} 2xx/3xx면 true, 그 외/오류면 false
+ */
+async function checkCDNUrlAvailable(url, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    try {
+      const u = new URL(url);
+      const lib = u.protocol === 'https:' ? https : http;
+      const req = lib.request(
+        { method: 'HEAD', hostname: u.hostname, port: u.port, path: u.pathname + u.search, timeout: timeoutMs },
+        (res) => {
+          const ok = res.statusCode && res.statusCode >= 200 && res.statusCode < 400;
+          // 소비 끝내기
+          res.resume();
+          resolve(Boolean(ok));
+        },
+      );
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(false);
+      });
+      req.end();
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function downloadAssetFromDB(query, mode) {
+  const { assetid, filename, version } = query;
+
+  switch (mode) {
+    case 'DEFAULT':
+      if (!assetid || typeof assetid !== 'string') {
+        throw new AppError('유효하지 않은 id 입니다.', 422, 'INVALID_ASSETID');
+      }
+
+      try {
+        const { url } = await AssetVersions.findOne({ assetId: new ObjectId(assetid), version: version });
+
+        return url;
+      } catch (err) {
+        throw new AppError('에셋 스냅샷 조회에 실패했습니다.', 422, 'FAILED_DOWNLOAD_ASSETVERSIONS');
+      }
+
+    case 'LATEST':
+      if (!filename || typeof filename !== 'string') {
+        throw new AppError('유효하지 않은 파일명 입니다.', 422, 'INVALID_FILENAME');
+      }
+
+      try {
+        const { latestVersion } = await getAssetByFileName({ filename });
+        await checkCDNUrlAvailable(latestVersion.url);
+
+        return latestVersion.url;
+      } catch (err) {
+        throw new AppError('파일명으로 최신버전 에셋 조회에 실패했습니다.', 422, 'FAILED_DOWNLOAD_LATEST');
+      }
+
+    default:
+      throw new AppError('유효하지 않은 mode값 입니다.', 500, 'INVALID_API_MODE');
+  }
+}
+
 module.exports = {
   checkMetaCorrect,
   getSafeObjectBuffer,
@@ -249,4 +316,5 @@ module.exports = {
   saveSafeModel,
   getAssetByFileName,
   getAssetsBySearchOptions,
+  downloadAssetFromDB,
 };

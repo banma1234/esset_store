@@ -1,31 +1,77 @@
 const express = require('express');
+const {
+  getAssetsBySearchOptions,
+  getAssetByFileName,
+  downloadAssetFromDB,
+} = require('../services/assets/assets.service');
+const { asyncHandler } = require('../utils/asyncHandler');
+const { AppError } = require('../errors/appError');
+
 const router = express.Router();
-const { getAssetsBySearchOptions, getAssetByFileName } = require('../services/assets/assets.service');
 
 /**
- * @route GET /api/v1/assets/search
- * @description 에셋 검색 (카테고리 + 필터 + 페이지네이션)
- * @query category 카테고리 코드 (예: CAT-BDY)
- * @query filters 필터 코드들 (예: ?filters=FIL-MAT-STL,FIL-UNI-MET 또는 filters=...&filters=...)
- * @query page 페이지 번호 (1부터 시작, 기본값 1)
+ * @function assetsSearchAPI
+ * @description 에셋 검색 (카테고리 + 필터 + 페이지네이션).
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @query category 카테고리 코드
+ * @query filters 필터 코드 배열
+ * @query page 페이지 번호
  */
-router.get('/api/v1/assets/search', async (req, res, next) => {
-  try {
-    const result = await getAssetsBySearchOptions(req.query);
+async function assetsSearchAPI(req, res) {
+  const result = await getAssetsBySearchOptions(req.query);
 
-    return res.status(200).json({ ok: true, data: result });
-  } catch (err) {
-    next(err);
+  if (!result) {
+    throw new AppError('검색에 실패했습니다.', 500, 'FAILED_SEARCH_ASSETS');
   }
-});
 
-router.get('/api/v1/assets', async (req, res, next) => {
-  try {
-    const result = await getAssetByFileName(req.query);
-    res.status(200).json({ ok: true, data: result });
-  } catch (err) {
-    next(err);
+  return res.status(200).json({ ok: true, data: result });
+}
+
+/**
+ * @function assetViewerAPI
+ * @description 에셋 이름으로 안전하게 에셋 가져오기.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @query filename 에셋 이름
+ */
+async function assetViewerAPI(req, res) {
+  const result = await getAssetByFileName(req.query);
+
+  if (!result) {
+    throw new AppError('해당 에셋을 찾을 수 없습니다.', 404, 'ASSET_NOT_FOUND');
   }
-});
+
+  res.status(200).json({ ok: true, data: result });
+}
+
+/**
+ * @function assetDownloadAPI
+ * @description 외부 다운로드 API.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @query filename 에셋 이름
+ * @query assetid 에셋 _id
+ */
+async function assetDownloadAPI(req, res) {
+  let url = undefined;
+
+  url = await downloadAssetFromDB(req.query, 'DEFAULT');
+  if (url) {
+    //return res.redirect(302, url);
+    return res.status(200).json({ ok: true, url: url });
+  }
+
+  url = await downloadAssetFromDB(req.query, 'LATEST');
+  if (url) {
+    return res.status(200).json({ ok: true, url: url });
+  }
+
+  throw new AppError('실패', 422, 'FAILED');
+}
+
+router.get('/api/v1/assets/search', asyncHandler(assetsSearchAPI));
+router.get('/api/v1/assets', asyncHandler(assetViewerAPI));
+router.get('/api/v1/assets/download', asyncHandler(assetDownloadAPI));
 
 module.exports = router;

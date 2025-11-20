@@ -50,8 +50,10 @@ async function enqueueThumbnailJob(body) {
     throw new AppError('유효한 key값이 아닙니다.', 422, 'KEY_MISMATCH');
   }
 
-  const thumbKey = buildThumbKey(fileName, userMeta.version, `thumb_${fileName}_`);
+  const thumbKey = buildThumbKey(fileName, userMeta.extras.esMeta.version, `thumb_${fileName}_`);
   const jobId = buildJobId(key, thumbKey);
+
+  // console.log(userMeta);
 
   const job = await assetPipelineQueue.add(
     'generate-thumbnail',

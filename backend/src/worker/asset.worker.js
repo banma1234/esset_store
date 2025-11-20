@@ -27,9 +27,9 @@ function assertJobData(data) {
   if (!Number.isFinite(data?.width) || !Number.isFinite(data?.height)) {
     throw new AppError('파일 크기가 일치하지 않습니다.', 422, 'SIZE_MISMATCH');
   }
-  if (!data?.userMeta.version) {
-    throw new AppError('버전이 존재하지 않습니다.', 422, 'VERSION_REQUIRED');
-  }
+  // if (!data?.userMeta.extras.esMeta.version) {
+  //   throw new AppError('버전이 존재하지 않습니다.', 422, 'VERSION_REQUIRED');
+  // }
 }
 
 const worker = new Worker(
@@ -41,6 +41,8 @@ const worker = new Worker(
     const data = job.data;
     assertJobData(data);
 
+    console.log(data);
+
     // 1) GLTF 본문 로드(UTF-8)
     const gltfBuffer = await getSafeObjectBuffer(data.key);
     const gltfStr = gltfBuffer.toString('utf8');
@@ -51,11 +53,13 @@ const worker = new Worker(
     // 3) 업로드
     await putThumbnail(data.thumbKey, jpeg);
 
+    const { esMeta, esUserData } = data.userMeta.extras;
+
     const updatedGltfStr = await injectMetadata({
       gltfJsonStr: gltfStr,
       thumbJpeg: jpeg,
-      version: data.userMeta.version,
-      userData: data.userMeta.userData,
+      version: esMeta.version,
+      userData: esUserData,
     });
 
     // ✅ 즉시 구조 점검
@@ -78,7 +82,7 @@ const worker = new Worker(
       key: data.key,
       gltfJsonStr: updatedGltfStr,
       body: data.body,
-      userMeta: data.userMeta,
+      userMeta: { version: esMeta.version, esUserData },
       thumbKey: data.thumbKey,
     });
 

@@ -1,7 +1,3 @@
-/**
- * @file gltf-meta.service.js
- * @description glTF(JSON)을 gltf-transform(NodeIO)로 읽어 메타데이터만 추출 (v4)
- */
 const core = require('@gltf-transform/core');
 const NodeIO = core?.NodeIO || core?.default?.NodeIO;
 const Document = core?.Document || core?.default?.Document;
