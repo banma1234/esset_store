@@ -41,21 +41,6 @@
           </div>
 
           <!-- ===================== -->
-          <!-- 메타데이터 파일 업로드 -->
-          <!-- ===================== -->
-          <v-divider class="my-6" />
-
-          <div class="text-subtitle-2 mb-2">
-            사용자 지정 메타데이터 파일 (json)
-          </div>
-
-          <v-alert v-if="meta.error" type="error" dense outlined class="mb-2">
-            {{ meta.error }}
-          </v-alert>
-
-          <input ref="metaInput" type="file" accept=".json" @change="onMetaPick" />
-
-          <!-- ===================== -->
           <!-- 카테고리 선택 영역     -->
           <!-- ===================== -->
           <v-divider class="my-6" />
@@ -134,7 +119,7 @@ import {
   buildFilterSelectItems,
   findFilterNodeInRoot
 } from '@/utils/commonCodes/commonCodeTree'
-import { getExt, mergeUserMeta } from '@/utils/assets/getMetaData'
+import { getExt, mergeGltfExtrasForEsset } from '@/utils/assets/getMetaData'
 
 // ✅ 이 페이지의 POLICY (페이지마다 다르게 정의 가능)
 const POLICY = { ...DEFAULT_POLICY }
@@ -306,35 +291,12 @@ export default {
     },
 
     /**
-     * @function onMetaPick
-     * @description 메타데이터 파일 선택 시 상태를 갱신하고 확장자를 검증한다.
-     *              - json 파일만 허용한다.
-     * @param {Event} e - input change 이벤트
-     */
-    onMetaPick(e) {
-      this.meta.error = ''
-      const f = e.target.files && e.target.files[0]
-      if (!f) {
-        this.meta.file = null
-        return
-      }
-
-      const ext = getExt(f.name)
-      if (ext !== 'json') {
-        this.meta.file = null
-        this.meta.error = 'json 파일만 선택할 수 있습니다.'
-        return
-      }
-
-      this.meta.file = f
-    },
-
-    /**
      * @function buildMergeUserMeta
      * @description 현재 선택된 카테고리 및 필터값을 검증하고,
      *              모두 선택된 경우 mergeUserMeta를 호출해 mergeObj를 생성한다.
      * @returns {Promise<Object|null>} mergeObj 또는 null
      */
+
     async buildMergeUserMeta() {
       this.filtersUi.error = ''
 
@@ -352,13 +314,14 @@ export default {
       const filterCodes = this.filtersUi.roots.map(
         root => this.filtersUi.values[root.code] || ''
       )
-
-      const mergedObj = await mergeUserMeta(this.meta.file, {
+      // 핵심: gltf에서 extras(userData 포함)를 추출하고 선택값을 병합
+      const userMeta = await mergeGltfExtrasForEsset(this.state.file, {
         categoryCode: category.code || '',
         filterCodes
       })
 
-      return mergedObj
+      console.log(userMeta)
+      return userMeta
     },
 
     /**
