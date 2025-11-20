@@ -1,11 +1,4 @@
 /**
- * @file AppError 및 에러 정규화 유틸
- * @description
- * - 모든 에러를 하나의 구조로 정규화하여 로깅/응답에 사용한다.
- * - status(HTTP), code(비즈니스 코드), details(배열/객체) 등을 포함한다.
- */
-
-/**
  * @class AppError
  * @classdesc 통합 에러 표현을 위한 커스텀 에러
  */

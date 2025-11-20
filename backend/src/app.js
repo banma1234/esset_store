@@ -32,13 +32,13 @@ app.get('/api/v1/test', (req, res) => {
   res.json({ message: 'test successful' });
 });
 
+app.use(requestContext());
+app.use(requestLogger());
 app.use(commonCodeRoutes);
 app.use(presignedRoutes);
 app.use(commitRoutes);
 app.use(logRoutes);
 app.use(assetsSearchRoutes);
-app.use(requestContext());
-app.use(requestLogger());
 app.use(errorHandler);
 
 app.use(test2Routes);

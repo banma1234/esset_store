@@ -1,10 +1,3 @@
-/**
- * @file 요청 컨텍스트 미들웨어
- * @description
- * - 요청 ID, 시작 시각, 클라이언트 IP 등 컨텍스트 정보를 부여한다.
- * - 에러 로깅 시 함께 기록되어 추적이 용이하다.
- */
-
 const { randomUUID } = require('crypto');
 
 /**
