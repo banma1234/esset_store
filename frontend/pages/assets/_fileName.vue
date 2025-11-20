@@ -34,6 +34,24 @@
           <ModelViewer v-else :model-url="state.modelUrl" />
         </div>
 
+        <!-- 하단: 다운로드 / 공유 Bottom Navigation -->
+        <v-bottom-navigation grow height="56" class="tw-border-t tw-border-gray-200">
+          <v-btn :disabled="!canDownload" @click="onClickDownload">
+            <v-icon large>mdi-download</v-icon>
+            <span>download</span>
+          </v-btn>
+
+          <v-btn :disabled="!canShare" @click="onClickShare">
+            <v-icon large>mdi-share-variant</v-icon>
+            <span>share</span>
+          </v-btn>
+
+          <v-btn>
+            <v-icon large>mdi-trash-can</v-icon>
+            <span>delete</span>
+          </v-btn>
+        </v-bottom-navigation>
+
         <!-- 메타 정보 카드 -->
         <v-card v-if="state.asset" outlined
           class="tw-w-full tw-max-w-3xl tw-mx-auto tw-px-4 tw-py-3 tw-bg-[#111111] tw-text-gray-100">
@@ -168,11 +186,22 @@ export default {
         code,
         name: this.state.codeNames[code] || code
       }))
+    },
+
+    /** 다운로드 / 공유 가능 여부 */
+    canDownload() {
+      return !!(this.state.asset && this.state.asset._id && this.state.asset.fileName)
+    },
+    canShare() {
+      return !!this.state.modelUrl || !!this.fileName
     }
   },
 
   async mounted() {
-    if (!process.client) return
+    if (!process.client) {
+      return
+    }
+
     await this.fetchAsset()
   },
 
@@ -216,17 +245,17 @@ export default {
       this.state.codeNames = {}
 
       const ok = await this.$err.guard(
-        async ({ error }) => {
+        async () => {
           const { data } = await this.$api.get('/assets', {
             query: { filename: fileName }
           })
 
-          if (!data || !data.latestVersion.url) {
-            return error({
-              statusCode: 404,
-              message: '해당 모델을 찾을 수 없습니다.'
-            })
-          }
+          // if (!data || !data.latestVersion.url) {
+          //   return error({
+          //     statusCode: 404,
+          //     message: '해당 모델을 찾을 수 없습니다.'
+          //   })
+          // }
 
           this.state.asset = data
           this.state.modelUrl = data.latestVersion.url
@@ -305,6 +334,74 @@ export default {
       if (!ok && !this.state.error) {
         // 공통코드 조회 실패해도 뷰어는 동작해야 하므로
         // 여기서는 치명적 에러로 처리하지 않고, 코드만 표시되도록 둔다.
+      }
+    },
+
+    /**
+     * @function onClickDownload
+     * @description 하단 네비게이션의 "다운로드" 버튼 클릭 처리
+     *              - /api/assets/download?assetid=${assetId}&filename=${fileName}
+     *              - 서버에서 302로 CDN으로 리다이렉트하는 구조를 가정하고,
+     *                XHR이 아닌 location 이동으로 다운로드를 유도한다.
+     */
+    async onClickDownload() {
+      const asset = this.state.asset
+      if (!asset || !asset._id) {
+        this.state.error = '다운로드할 모델 정보가 없습니다.'
+        return
+      }
+
+      await this.$err.guard(
+        async () => {
+          const { url } = await this.$api.get('/assets/download', {
+            query: { assetid: asset._id, filename: encodeURIComponent(asset.fileName), version: asset.latestVersion.version }
+          })
+
+          window.location.href = url
+
+          return true
+        },
+        { context: { where: 'AssetViewerByFileName.fetchAsset' } }
+      )
+
+
+
+      // 브라우저 기본 다운로드 흐름(302 포함)을 사용
+      //  window.location.href = url
+    },
+
+    /**
+     * @function onClickShare
+     * @description 하단 네비게이션의 "공유" 버튼 클릭 처리
+     *              - 현재 페이지 URL을 클립보드에 복사한다.
+     */
+    async onClickShare() {
+      const shareUrl = window.location.href
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(shareUrl)
+        } else {
+          // 구형 브라우저용 폴백
+          const textarea = document.createElement('textarea')
+          textarea.value = shareUrl
+          textarea.style.position = 'fixed'
+          textarea.style.left = '-9999px'
+          document.body.appendChild(textarea)
+          textarea.focus()
+          textarea.select()
+          document.execCommand('copy')
+          document.body.removeChild(textarea)
+        }
+
+        // 간단 피드백 (원하면 v-snackbar로 교체 가능)
+        // eslint-disable-next-line no-alert
+        alert('링크가 클립보드에 복사되었습니다.')
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[share error]', e)
+        // eslint-disable-next-line no-alert
+        alert('링크 복사에 실패했습니다.')
       }
     },
 
