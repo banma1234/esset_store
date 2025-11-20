@@ -11,6 +11,8 @@ const { Schema } = mongoose;
  * @property {string} url 해당 버전 파일의 CDN/S3 URL
  * @property {string} thumbnail 썸네일 URL
  * @property {Date} updatedAt 최근 갱신 시각
+ * @property {Date|null} deletedAt 삭제 시각(소프트 삭제용, 미삭제 시 null)
+ * @property {boolean} isActive 활성/비활성 플래그
  */
 
 // models/assets/AssetVersions.model.js
@@ -47,6 +49,14 @@ const assetVersionSchema = new Schema({
   updatedAt: {
     type: Date,
     default: () => new Date(),
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
   },
 });
 

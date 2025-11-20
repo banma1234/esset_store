@@ -308,6 +308,61 @@ async function downloadAssetFromDB(query, mode) {
   }
 }
 
+async function deactivateAssetById(body) {
+  const { _id, assetId, fileName, version } = body;
+  const now = new Date();
+  
+  try {
+    await AssetVersions.updateOne({ _id: new ObjectId(_id) }, { isActive: false, deletedAt: now });
+    const assetOrigin = await Asset.findOne({ _id: new ObjectId(assetId) }).lean();
+
+    console.log(assetOrigin)
+    console.log("==================")
+
+    if (assetOrigin.latestVersion.version === version) {
+      const restVersions = await AssetVersions.find({ assetId: new ObjectId(assetId), isActive: true }.sort({ version: 1 })).lean();
+
+      console.log(restVersions);
+      console.log("==================")
+
+      if (restVersions.length > 0) {
+        const latestVersion = { version: restVersions[0].version, url: restVersions[0].url };
+
+        console.log(latestVersion);
+        console.log("==================")
+
+        await Asset.updateOne({ _id: new ObjectId(assetId) }, { latestVersion: latestVersion, thumbnail: restVersions[0].thumbnail, sizeBytes: restVersions[0].sizeBytes, updatedAt: now })
+
+        handleLogEvent({
+          type: 'ASSET_EVENT',
+          payload: {
+            eventType: 'UPDATE',
+            assetId: assetId,
+            assetVersionsId: _id,
+            fileName: fileName,
+            version: latestVersion.version
+        },
+      });
+      } else {
+        await Asset.updateOne({ _id: new ObjectId(assetId) }, { isActive: false, deletedAt: now })
+      }
+    }
+
+      handleLogEvent({
+        type: 'ASSET_EVENT',
+        payload: {
+          eventType: 'DELETE',
+          assetId: assetId,
+          assetVersionsId: _id,
+          fileName: fileName,
+          version: version
+        },
+      });
+  } catch (err) {
+    throw new AppError('에셋 비활성화에 실패했습니다.', 422, 'FAILED_ASSET_DEACTIVATE')
+  }
+}
+
 module.exports = {
   checkMetaCorrect,
   getSafeObjectBuffer,
@@ -317,4 +372,5 @@ module.exports = {
   getAssetByFileName,
   getAssetsBySearchOptions,
   downloadAssetFromDB,
+  deactivateAssetById
 };

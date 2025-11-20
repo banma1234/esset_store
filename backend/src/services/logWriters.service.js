@@ -22,7 +22,7 @@ const { AppError } = require('../errors/appError');
  * @typedef {Object} AssetEventPayload
  * @property {AssetEventType} eventType 이벤트 타입 (CREATE/UPDATE/DELETE)
  * @property {import('mongoose').Types.ObjectId} assetId 참조 대상 에셋 ID (assets._id)
- * @property {import('mongoose').Types.ObjectId} assetVersionsId 참조 대상 에셋 버전 ID (assetVersions._id)
+ * @property {import('mongoose').Types.ObjectId || undefined} assetVersionsId 참조 대상 에셋 버전 ID (assetVersions._id)
  * @property {string} [fileName] 파일 이름
  * @property {string} [version] 버전 번호
  */
@@ -185,11 +185,11 @@ async function writeAssetSnapshot(payload) {
  * @param {Object} [opts]
  * @param {string|string[]} [opts.assetIds]   - 특정 에셋만 필터(선택)
  * @param {string|string[]} [opts.fileTypes]  - 파일 형식 필터(선택)
- * @param {boolean} [opts.excludeDeleted=true] - deletedAt != null 문서 제외 여부
+ * @param {boolean} [opts.excludeDeleted=false] - deletedAt != null 문서 제외 여부
  * @returns {Promise<VersionGroup[]>}
  */
 async function getAssetVersionGroups(opts = {}) {
-  const { assetIds, fileTypes, excludeDeleted = true } = opts;
+  const { assetIds, fileTypes, excludeDeleted = false } = opts;
 
   /** @type {any[]} */
   const pipeline = [];
@@ -225,6 +225,8 @@ async function getAssetVersionGroups(opts = {}) {
           url: '$url',
           thumbnail: '$thumbnail',
           updatedAt: '$updatedAt',
+          isActive: '$isActive',
+          deletedAt: '$deletedAt'
         },
       },
     },
