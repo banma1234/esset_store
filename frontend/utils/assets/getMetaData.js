@@ -1,193 +1,139 @@
-// utils/assets/getMetaData.js
-
-/**
- * @function getExt
- * @description 파일명에서 확장자를 소문자로 추출한다.
- * @param {string} [filename=""] - 파일명
- * @returns {string} 추출된 확장자(마침표 제외), 없으면 빈 문자열
- */
-export function getExt(filename = "") {
-  const m = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
-  return m ? m[1] : "";
-}
-
-/**
- * @function formatBytes
- * @description 바이트 크기를 사람이 읽기 쉬운 단위(B, KB, MB)로 변환한다.
- * @param {number} [n=0] - 바이트 크기
- * @returns {string} 변환된 문자열
- */
-export function formatBytes(n = 0) {
-  if (n < 1024) return `${n} B`;
-  const kb = n / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(1)} MB`;
-}
-
 /**
  * @function bumpVersion
- * @description 버전 1 증가시키는 함수.
- * @param {string} versionStr - "1.0.5" 형식의 버전 문자열
- * @returns {string} - 1 증가된 버전 문자열 (예: "1.0.6")
+ * @description "x.y.z" (각 자리 한 자리 숫자 0~9) 형태의 버전을 +1 한다.
+ * @example "1.0.0" -> "1.0.1"
  */
 function bumpVersion(versionStr) {
   if (typeof versionStr !== "string") {
     throw new Error("bumpVersion: versionStr 는 문자열이어야 합니다.");
   }
-
   const parts = versionStr.split(".");
-
-  // "x.y.z" 형태인지 체크
   if (parts.length !== 3) {
-    throw new Error('bumpVersion: "x.y.z" 형식의 버전만 지원합니다.');
+    throw new Error('bumpVersion: "x.y.z" 형식만 지원합니다.');
   }
-
-  // 각 파트가 한 자리 숫자인지 체크
   if (!parts.every((p) => /^[0-9]$/.test(p))) {
-    throw new Error(
-      "bumpVersion: 각 버전 파트는 한 자리 숫자(0~9)여야 합니다."
-    );
+    throw new Error("bumpVersion: 각 파트는 한 자리 숫자(0~9)여야 합니다.");
   }
-
-  // 1) "1.0.5" → ["1","0","5"] → "105"
-  const compactStr = parts.join("");
-  const num = Number(compactStr);
-
-  if (!Number.isFinite(num)) {
-    throw new Error("bumpVersion: 숫자 변환에 실패했습니다.");
-  }
-
-  // 2) 105 + 1 → 106
-  const bumped = num + 1;
-
-  // 3) 다시 문자열로 변환 후, 원래 자릿수(3자리)를 유지
-  const bumpedStr = String(bumped).padStart(parts.length, "0");
-
-  // 4) "106" → ["1","0","6"] → "1.0.6"
-  const nextParts = bumpedStr.split("");
-  const nextVersion = nextParts.join(".");
-
-  return nextVersion;
-}
-
-/**
- * @function getMetaData
- * @description json 메타데이터 파일의 기본 정보와 텍스트 내용을 추출한다.
- *              - json 이 아닌 확장자는 unsupported 로 처리한다.
- * @param {File} file - 업로드된 파일 객체
- * @returns {Promise<Object>} 메타데이터 정보 객체
- */
-export async function getMetaData(file) {
-  const ext = getExt(file.name);
-  const base = {
-    filename: file.name,
-    ext,
-    mime: file.type || null,
-    size: file.size,
-    sizeHuman: formatBytes(file.size),
-  };
-
-  if (ext !== "json") {
-    return {
-      ...base,
-      type: "unsupported",
-    };
-  }
-
-  try {
-    const text = await file.text();
-    return {
-      ...base,
-      type: "json",
-      text,
-    };
-  } catch (e) {
-    return {
-      ...base,
-      type: "error",
-      parseError: e?.message || String(e),
-    };
-  }
+  const num = Number(parts.join(""));
+  if (!Number.isFinite(num)) throw new Error("bumpVersion: 숫자 변환 실패");
+  const bumped = String(num + 1).padStart(parts.length, "0"); // 길이 유지
+  return bumped.split("").join("."); // "106" -> "1.0.6"
 }
 
 /**
  * @typedef {Object} MergeSelection
- * @property {string} categoryCode      - 선택된 카테고리 코드
- * @property {string[]} filterCodes     - 선택된 필터 코드 배열
+ * @property {string} categoryCode
+ * @property {string[]} filterCodes
  */
 
+/** 내부: 브라우저 File → UTF-8 텍스트 */
+async function readFileAsText(file) {
+  const text = await file.text();
+  return String(text || "");
+}
+
+/** 내부: buffers/images가 모두 data: 인지 (Embedded 확인) */
+function isEmbeddedGltfJSON(gltf) {
+  const isData = (u) => typeof u === "string" && u.startsWith("data:");
+  if (Array.isArray(gltf?.buffers)) {
+    for (const b of gltf.buffers) {
+      if (b?.uri && !isData(b.uri)) return false;
+    }
+  }
+  if (Array.isArray(gltf?.images)) {
+    for (const i of gltf.images) {
+      if (i?.uri && !isData(i.uri)) return false;
+    }
+  }
+  return true;
+}
+
 /**
- * @function mergeUserMeta
- * @description 기존 메타데이터 파일에 입력한 메타데이터 덮어씌우기 *
- * @param {File|null|undefined} metaFile - 사용자 메타데이터 json 파일
- * @param {MergeSelection} selection      - 선택된 카테고리/필터 코드 정보
- * @returns {Promise<Object>} 병합된 최종 메타데이터 객체(mergeObj)
+ * @function mergeGltfExtrasForEsset
+ * @description .gltf의 루트 extras에서 esMeta/esUserData/esThumb를 읽고,
+ *              selection(category/filters)을 반영해 userMeta를 생성한다.
+ *              - version: extras.esMeta.version을 읽어 bump 후 덮어쓰기
+ *              - uploadedAt 등 시간 필드는 클라이언트에서 무시(세팅/변경 안 함)
+ *              - esThumb는 서버 담당: 있으면 보존, 없으면 생성하지 않음
+ * @param {File} gltfFile - .gltf(Embedded)
+ * @param {MergeSelection} selection
+ * @returns {Promise<Object>} userMeta  // upload3DModel의 userMeta로 그대로 전달
  */
-export async function mergeUserMeta(metaFile, selection) {
+export async function mergeGltfExtrasForEsset(gltfFile, selection) {
+  if (!gltfFile)
+    throw new Error("mergeGltfExtrasForEsset: gltfFile이 없습니다.");
+
+  // 1) 파싱
+  let gltf;
+  try {
+    const text = await readFileAsText(gltfFile);
+    gltf = JSON.parse(text);
+  } catch {
+    throw new Error("INVALID_GLTF_JSON");
+  }
+
+  // 2) Embedded만 허용
+  if (!isEmbeddedGltfJSON(gltf)) {
+    throw new Error("내장형(Embedded) glTF만 업로드할 수 있습니다.");
+  }
+
+  // 3) 루트 extras 확보
+  if (!gltf.extras || typeof gltf.extras !== "object") gltf.extras = {};
+  const extras = gltf.extras;
+
+  // 4) esMeta 보장 + version bump (uploadedAt은 무시)
+  if (!extras.esMeta || typeof extras.esMeta !== "object") extras.esMeta = {};
+  const prevVer =
+    typeof extras.esMeta.version === "string"
+      ? extras.esMeta.version.trim()
+      : "";
+  let nextVersion = "1.0.0";
+  if (prevVer) {
+    try {
+      nextVersion = bumpVersion(prevVer);
+    } catch {
+      nextVersion = "1.0.0";
+    }
+  }
+  extras.esMeta.version = nextVersion;
+  // extras.esMeta.uploadedAt: 클라이언트에서 세팅/수정하지 않음(무시)
+
+  // 5) esUserData 보장 + 선택값 반영
+  if (!extras.esUserData || typeof extras.esUserData !== "object")
+    extras.esUserData = {};
+  const userData = extras.esUserData;
+
   const categoryCode = (selection && selection.categoryCode) || "";
   const filterCodes = Array.isArray(selection?.filterCodes)
     ? selection.filterCodes
     : [];
 
-  // json 파일이 주어진 경우 → 기존 JSON에 병합 시도
-  if (metaFile) {
-    const metaInfo = await getMetaData(metaFile);
+  // 필수 구조 보장
+  if (typeof userData.links !== "object" || userData.links === null)
+    userData.links = {};
+  if (typeof userData.rigs !== "object" || userData.rigs === null)
+    userData.rigs = {};
 
-    if (metaInfo.type === "json" && metaInfo.text) {
-      let parsed;
-      try {
-        parsed = JSON.parse(metaInfo.text);
-      } catch (e) {
-        parsed = {};
-      }
+  // 선택값이 우선(강제 덮어쓰기)
+  userData.category = categoryCode;
+  userData.filters = filterCodes;
 
-      if (typeof parsed !== "object" || parsed === null) {
-        parsed = {};
-      }
+  // 6) esThumb는 서버 책임 → 존재 시 그대로 보존, 없으면 생성하지 않음
+  // if (!extras.esThumb) { /* do nothing */ }
 
-      // userData 보장
-      if (!parsed.userData || typeof parsed.userData !== "object") {
-        parsed.userData = {};
-      }
-
-      // 옛날 오타 필드(catergory)는 있으면 제거
-      if (Object.prototype.hasOwnProperty.call(parsed.userData, "catergory")) {
-        delete parsed.userData.catergory;
-      }
-
-      // 🔥 version 처리
-      // - 기존 userData.version 이 있으면 bumpVersion 적용
-      // - 없거나 에러 시 "1.0.0" 으로 설정
-      const prevVersion = parsed.version;
-      let nextVersion = "1.0.0";
-
-      if (typeof prevVersion === "string" && prevVersion.trim()) {
-        try {
-          nextVersion = bumpVersion(prevVersion.trim());
-        } catch (e) {
-          // bump 실패 시에도 1.0.0 으로 초기화
-          nextVersion = "1.0.0";
-        }
-      }
-      parsed.version = nextVersion;
-
-      // 🔥 category / filters 는 기존 값을 버리고, 선택 값을 기준으로 강제 덮어쓰기
-      parsed.userData.category = categoryCode;
-      parsed.userData.filters = filterCodes;
-
-      return parsed;
-    }
-  }
-
-  // metaFile 이 없거나, json 이 아니거나, 파싱 실패/unsupported 인 경우
+  // 7) 최종 userMeta(서버 커밋 바디에 실릴 객체)
+  //    필요하면 서버에서 extras.esMeta.uploadedAt/썸네일 생성 후 갱신
   return {
-    version: "1.0.0",
-    userData: {
-      category: categoryCode,
-      filters: filterCodes,
-      links: {},
-      rigs: {},
+    extras: {
+      esMeta: { version: extras.esMeta.version }, // uploadedAt은 명시적으로 싣지 않음(서버에서 처리)
+      esUserData: {
+        rigs: userData.rigs,
+        links: userData.links,
+        category: userData.category,
+        filters: userData.filters,
+      },
+      // esThumb는 있으면 포함하고, 없으면 생략
+      ...(extras.esThumb ? { esThumb: extras.esThumb } : {}),
     },
   };
 }
