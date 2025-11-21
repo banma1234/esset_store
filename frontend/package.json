@@ -1,8 +1,6 @@
 {
   "name": "frontend",
   "version": "1.0.0",
-  "description": "EssetStore frontend app",
-  "author": "banma1234",
   "private": true,
   "scripts": {
     "dev": "nuxt",
@@ -16,7 +14,6 @@
   },
   "devDependencies": {
     "@mdi/font": "7.4.47",
-    "@nuxtjs/proxy": "^2.1.0",
     "@nuxtjs/tailwindcss": "^6.11.4",
     "@nuxtjs/vuetify": "^1.12.3",
     "autoprefixer": "^10.4.16",

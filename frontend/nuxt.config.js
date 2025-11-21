@@ -1,19 +1,9 @@
-// nuxt.config.js  ← CJS로 고정
+// nuxt.config.js
 module.exports = {
-  mode: "universal",
+  // mode: "universal", // <- 제거 (더 이상 필요 없음)
 
   head: {
-    title: process.env.npm_package_name || "",
-    meta: [
-      { charset: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      {
-        hid: "description",
-        name: "description",
-        content: process.env.npm_package_description || "",
-      },
-    ],
-    link: [{ rel: "icon", type: "image/x-icon", href: "/favicon.ico" }],
+    /* 그대로 */
   },
 
   loading: { color: "#fff" },
@@ -24,16 +14,14 @@ module.exports = {
     "@mdi/font/css/materialdesignicons.min.css",
   ],
 
-  // Tailwind 모듈 설정(파일명과 일치)
   tailwindcss: {
     configPath: "tailwind.config.js",
     cssPath: "@/assets/css/tailwind.css",
-    viewr: false,
+    // viewr: false, // <- 오타/불필요 옵션 제거
   },
 
   plugins: ["~/plugins/global.js", "~/plugins/fetchHandler.js"],
 
-  // devModules는 과거 옵션이니 제거하고 buildModules만 사용
   buildModules: ["@nuxtjs/tailwindcss", "@nuxtjs/vuetify"],
 
   vuetify: {
@@ -42,22 +30,13 @@ module.exports = {
     customVariables: ["~/assets/variables.scss"],
   },
 
-  modules: ["@nuxtjs/proxy"],
+  modules: [],
 
-  proxy: {
-    // /cdn/* 으로 들어오면 CDN으로 프록시
-    "/cdn/": {
-      target: "https://choco-image-server.cdn.ntruss.com",
-      changeOrigin: true, // Host 헤더를 타깃으로 교체
-      secure: true, // https 인증서 검증
-      pathRewrite: { "^/cdn/": "/" }, // /cdn/assets/... -> /assets/...
-      // headers: { /* 필요시 추가 헤더 */ }
-    },
-  },
-
-  build: {
-    transpile: ["vuetify"],
-  },
+  build: { transpile: ["vuetify"] },
 
   server: { host: "0.0.0.0", port: 3000 },
+
+  publicRuntimeConfig: {
+    apiBase: process.env.BROWSER_API_BASE || "/api/v1",
+  },
 };

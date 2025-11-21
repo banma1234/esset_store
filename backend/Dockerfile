@@ -1,17 +1,27 @@
-FROM node:18-alpine
+# 크롬과 런타임 의존성이 모두 포함된 이미지
+FROM ghcr.io/puppeteer/puppeteer:22.7.1
+
 WORKDIR /usr/src/app
 
-# 패키지 메타만 먼저 복사 → 캐시 최적화
+# 루트로 디렉터리/권한 준비
+USER root
+RUN mkdir -p /usr/src/app/logs && \
+    chown -R pptruser:pptruser /usr/src/app
+
+# 패키지 설치
 COPY package*.json ./
 RUN npm ci --omit=dev
 
 # 소스 복사
 COPY . .
 
-# 환경변수(포트 등)
+# 실행 유저를 비-root로 전환
+USER pptruser
+
+# Puppeteer가 사용할 실행파일 경로 (이미지에 포함됨)
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 ENV NODE_ENV=production
 ENV PORT=4000
-EXPOSE 4000
 
-# 건강검진 엔드포인트가 /health 라면, 추후 compose에서 healthcheck로 활용 가능
-CMD ["npm", "run", "start"]
+EXPOSE 4000
+CMD ["npm","run","start"]

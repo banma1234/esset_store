@@ -23,7 +23,7 @@ import {
 function createApiClient(
   ctx,
   {
-    baseURL = process.env.API_BASE_URL || "http://localhost:4000/api/v1",
+    baseURL = process.env.BROWSER_BASE_URL || "/api/v1",
     defaultHeaders = {},
     getAuthToken = null,
     defaultTimeout = 15000, // 15s
@@ -91,6 +91,7 @@ function createApiClient(
         body: finalBody,
         signal: ac.signal,
         credentials: "omit", // 필요시 'include'
+        cache: "no-store",
       });
     } catch (e) {
       clearTimeout(timer);
@@ -178,7 +179,7 @@ function createApiClient(
 export default function (ctx, inject) {
   // $err 플러그인이 먼저 로드되어 있어야 함.
   const api = createApiClient(ctx, {
-    baseURL: process.env.API_BASE_URL || "http://localhost:4000/api/v1",
+    baseURL: (ctx.$config && ctx.$config.apiBase) || "/api/v1",
     defaultHeaders: async () => ({
       // 공통 헤더(필요 시): 'X-Requested-With': 'fetch'
     }),
