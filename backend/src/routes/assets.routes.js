@@ -69,7 +69,7 @@ async function assetDownloadAPI(req, res) {
     return res.status(200).json({ ok: true, url: url });
   }
 
-  throw new AppError('실패', 422, 'FAILED_GET_DOWNLOAD_URL');
+  throw new AppError('다운로드 요청에 실패했습니다.', 422, 'FAILED_GET_DOWNLOAD_URL');
 }
 
 /**
@@ -91,7 +91,6 @@ async function assetDeactivateAPI(req, res) {
  * @param {import('express').Response} res
  */
 async function assetActivateAPI(req, res) {
-  console.log(req.body);
   await activateAssetById(req.body);
 
   return res.status(200).json({ ok: true });

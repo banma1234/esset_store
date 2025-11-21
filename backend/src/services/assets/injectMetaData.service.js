@@ -1,8 +1,3 @@
-// src/services/assets/injectMetaData.service.js
-/**
- * @file inject-metadata.service.js
- * @description glTF(JSON, Embedded)에 썸네일/버전/업로드일/userData 주입 (gltf-transform v4)
- */
 const { Buffer } = require('buffer');
 const core = require('@gltf-transform/core');
 
