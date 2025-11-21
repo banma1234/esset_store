@@ -10,7 +10,7 @@ const { ObjectId } = require('mongodb');
  */
 async function loadParentFor(parentId) {
   if (!parentId) return null;
-  return CommonCode.findOne({ _id: new ObjectId(parentId), deletedAt: null }).lean();
+  return CommonCode.findOne({ _id: new ObjectId(parentId), isActive: true }).lean();
 }
 
 /**
@@ -55,8 +55,14 @@ async function saveCommonCode(payload) {
 
 async function updateCommonCode(payload) {
   const { code, name, isActive } = payload;
+  let query = { code, name, isActive };
 
-  await CommonCode.updateOne({ code: code }, { code, name, isActive });
+  if (!isActive) {
+    const now = new Date();
+    query = { ...query, deletedAt: now };
+  }
+
+  await CommonCode.updateOne({ code: code }, query);
 }
 
 /**
@@ -66,7 +72,7 @@ async function updateCommonCode(payload) {
  * @returns {Promise<object|null>} 문서(lean) 또는 null
  */
 async function getCommonCodeByCode(code) {
-  return CommonCode.findOne({ code: code, deletedAt: null }).lean();
+  return CommonCode.findOne({ code: code, isActive: true }).lean();
 }
 
 /**
@@ -76,7 +82,7 @@ async function getCommonCodeByCode(code) {
  * @returns {Promise<{filters: object[], categories: object[]}>}
  */
 async function getAllCommonCodes() {
-  const codes = await CommonCode.find({ deletedAt: null }).sort({ depth: 1, code: 1 }).lean();
+  const codes = await CommonCode.find({ isActive: true }).sort({ depth: 1, code: 1 }).lean();
 
   /** @type {object[]} */
   const filters = [];
