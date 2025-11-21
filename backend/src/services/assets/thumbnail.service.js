@@ -13,6 +13,7 @@ async function getBrowser() {
   if (_browser?.isConnected()) return _browser;
   _browser = await puppeteer.launch({
     headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -139,7 +140,7 @@ async function renderGltfToJpeg(gltfStr, { width, height }) {
 
       // === 씬 구성 ===
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x1f1f1f);
+      scene.background = new THREE.Color(0x2f2f2f);
       const camera = new THREE.PerspectiveCamera(45, W / H, 0.01, 10000);
       scene.add(new THREE.AmbientLight(0xffffff, 0.9));
       const dir = new THREE.DirectionalLight(0xffffff, 0.9);
