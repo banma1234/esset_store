@@ -320,7 +320,6 @@ export default {
         filterCodes
       })
 
-      console.log(userMeta)
       return userMeta
     },
 
