@@ -15,6 +15,8 @@ const { Schema } = mongoose;
  * @property {string} thumbnail 썸네일
  * @property {string} category 카테고리 정보 객체
  * @property {string[]} filters 필터 정보 배열
+ * @property {Object} counts 메쉬 카운트
+ * @property {Object} buffers 버퍼 카운트
  * @property {LatestVersionInfo} latestVersion 최신 버전 정보
  * @property {Date} updatedAt 최근 갱신 시각
  * @property {Date|null} deletedAt 삭제 시각(소프트 삭제용, 미삭제 시 null)
@@ -53,6 +55,16 @@ const assetSchema = new Schema({
   filters: {
     type: [String],
     default: [],
+  },
+
+  counts: {
+    type: Object,
+    default: {},
+  },
+
+  buffers: {
+    type: Object,
+    default: {},
   },
 
   /** 최신 버전 정보 */

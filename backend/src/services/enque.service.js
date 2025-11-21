@@ -46,6 +46,9 @@ async function enqueueThumbnailJob(body) {
   const { key, fileName, userMeta } = body;
   const { width, height } = DEFAULT_PAGE_SETUP;
 
+  console.log(body);
+  console.log('===================');
+
   if (!key || !key.toLowerCase().endsWith('gltf')) {
     throw new AppError('유효한 key값이 아닙니다.', 422, 'KEY_MISMATCH');
   }

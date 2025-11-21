@@ -53,13 +53,16 @@ const worker = new Worker(
     // 3) 업로드
     await putThumbnail(data.thumbKey, jpeg);
 
-    const { esMeta, esUserData } = data.userMeta.extras;
+    // 클라이언트에서 전달받은 counts, buffers
+    const { esMeta, esUserData, esStats } = data.userMeta.extras;
 
     const updatedGltfStr = await injectMetadata({
       gltfJsonStr: gltfStr,
       thumbJpeg: jpeg,
       version: esMeta.version,
       userData: esUserData,
+      counts: esStats.counts,
+      buffers: esStats.buffers,
     });
 
     // ✅ 즉시 구조 점검
@@ -82,7 +85,7 @@ const worker = new Worker(
       key: data.key,
       gltfJsonStr: updatedGltfStr,
       body: data.body,
-      userMeta: { version: esMeta.version, esUserData },
+      userMeta: { version: esMeta.version, esUserData, esStats },
       thumbKey: data.thumbKey,
     });
 

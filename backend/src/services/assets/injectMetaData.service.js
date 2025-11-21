@@ -22,7 +22,15 @@ if (typeof NodeIO !== 'function' || typeof Document !== 'function') {
  * @property {Record<string, any>=} userData
  */
 async function injectMetadata(params) {
-  const { gltfJsonStr, thumbJpeg, version, uploadedAt, userData = {} } = params;
+  const {
+    gltfJsonStr,
+    thumbJpeg,
+    version,
+    uploadedAt,
+    userData = {},
+    counts = undefined,
+    buffers = undefined,
+  } = params;
 
   if (typeof gltfJsonStr !== 'string' || gltfJsonStr.length < 10) {
     throw new Error('injectMetadata: INVALID_GLTF_JSON');
@@ -56,7 +64,8 @@ async function injectMetadata(params) {
 
   // 3) extras는 Root에 기록 (asset.setExtras 아님)
   const prevRootExtras = (typeof root.getExtras === 'function' && root.getExtras()) || {};
-  root.setExtras({
+
+  const nextExtras = {
     ...prevRootExtras,
     esThumb: { textureIndex, mimeType: 'image/jpeg' },
     esMeta: {
@@ -64,7 +73,18 @@ async function injectMetadata(params) {
       uploadedAt: new Date(uploadedAt || Date.now()).toISOString(),
     },
     esUserData: { ...userData },
-  });
+  };
+
+  // 🔹 counts / buffers 를 esStats에 패키징해서 extras에 포함
+  if (counts || buffers) {
+    nextExtras.esStats = {
+      ...(prevRootExtras.esStats || {}),
+      ...(counts ? { counts } : {}),
+      ...(buffers ? { buffers } : {}),
+    };
+  }
+
+  root.setExtras(nextExtras);
 
   // 4) 내보내기(분리 리소스) → data:URI 인라인
   const out = await io.writeJSON(doc);

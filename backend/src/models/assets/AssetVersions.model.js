@@ -11,6 +11,8 @@ const { Schema } = mongoose;
  * @property {string} url 해당 버전 파일의 CDN/S3 URL
  * @property {string} thumbnail 썸네일 URL
  * @property {Date} updatedAt 최근 갱신 시각
+ * @property {Object} counts 메쉬 카운트
+ * @property {Object} buffers 버퍼 카운트
  * @property {Date|null} deletedAt 삭제 시각(소프트 삭제용, 미삭제 시 null)
  * @property {boolean} isActive 활성/비활성 플래그
  */
@@ -45,6 +47,15 @@ const assetVersionSchema = new Schema({
   },
   thumbnail: {
     type: String,
+  },
+  counts: {
+    type: Object,
+    default: {},
+  },
+
+  buffers: {
+    type: Object,
+    default: {},
   },
   updatedAt: {
     type: Date,
