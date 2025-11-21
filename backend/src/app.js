@@ -22,6 +22,14 @@ app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(morgan('combined'));
 
+app.set('etag', false);
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 app.get('/health', (req, res) => {
   const db = mongoHealth();
   res.json({ ok: db.status === 'up', db });
