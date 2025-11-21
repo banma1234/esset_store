@@ -18,42 +18,31 @@
                             {{ state.error }}
                         </v-alert>
 
-                    <v-treeview
-                        v-else
-                        :items="tree.items"
-                        :active.sync="tree.active"
-                        item-key="id"
-                        item-children="children"
-                        activatable
-                        open-on-click
-                        dense
-                        transition
-                        @update:active="onActiveChange"
-                    >
-                        <template #label="{ item }">
-                            <!-- 루트: 파일 이름 -->
-                            <div v-if="item.type === 'asset'" class="d-flex align-center">
-                            <span class="font-weight-medium">
-                                {{ item.fileName }}
-                            </span>
-                            </div>
+                        <v-treeview v-else :items="tree.items" :active.sync="tree.active" item-key="id"
+                            item-children="children" activatable open-on-click dense transition
+                            @update:active="onActiveChange">
+                            <template #label="{ item }">
+                                <!-- 루트: 파일 이름 -->
+                                <div v-if="item.type === 'asset'" class="d-flex align-center">
+                                    <span class="font-weight-medium">
+                                        {{ item.fileName }}
+                                    </span>
+                                </div>
 
-                            <!-- 버전 노드 -->
-                            <div v-else-if="item.type === 'version'" class="d-flex flex-column">
-                            <div class="d-flex align-center">
-                                <span
-                                class="font-weight-medium"
-                                :class="{ 'red--text text--darken-2': item.isActive === false }"
-                                >
-                                v{{ item.version }}
-                                </span>
-                                <span class="grey--text text--darken-1 ml-2 text-caption">
-                                {{ formatBytes(item.sizeBytes) }}
-                                </span>
-                            </div>
-                            </div>
-                        </template>
-                    </v-treeview>
+                                <!-- 버전 노드 -->
+                                <div v-else-if="item.type === 'version'" class="d-flex flex-column">
+                                    <div class="d-flex align-center">
+                                        <span class="font-weight-medium"
+                                            :class="{ 'red--text text--darken-2': item.isActive === false }">
+                                            v{{ item.version }}
+                                        </span>
+                                        <span class="grey--text text--darken-1 ml-2 text-caption">
+                                            {{ formatBytes(item.sizeBytes) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </template>
+                        </v-treeview>
                     </v-card-text>
                 </v-card>
             </v-col>
@@ -84,6 +73,78 @@
                                     class="grey lighten-4" />
                             </div>
 
+                            <!-- 🔹 아주 컴팩트한 counts / buffers 토글 -->
+                            <div v-if="hasCounts || hasBuffers" class="mt-1">
+                                <!-- counts 섹션 -->
+                                <div v-if="hasCounts" class="mb-2">
+                                    <div class="d-flex align-center mb-1">
+                                        <span class="tw-text-xs tw-font-medium">
+                                            지오메트리 통계 (counts)
+                                        </span>
+                                        <v-spacer />
+                                        <v-btn icon x-small @click="ui.showCounts = !ui.showCounts">
+                                            <v-icon small>
+                                                {{ ui.showCounts ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
+                                            </v-icon>
+                                        </v-btn>
+                                    </div>
+
+                                    <v-expand-transition>
+                                        <div v-show="ui.showCounts">
+                                            <v-simple-table dense>
+                                                <tbody>
+                                                    <tr v-for="(value, key) in detail.data.counts"
+                                                        :key="`counts-${key}`">
+                                                        <td class="tw-text-xs tw-font-medium">
+                                                            {{ key }}
+                                                        </td>
+                                                        <td class="tw-text-xs tw-font-mono">
+                                                            {{ value }}
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </v-simple-table>
+                                        </div>
+                                    </v-expand-transition>
+                                </div>
+
+                                <!-- buffers 섹션 -->
+                                <div v-if="hasBuffers">
+                                    <div class="d-flex align-center mb-1">
+                                        <span class="tw-text-xs tw-font-medium">
+                                            버퍼 정보 (buffers)
+                                        </span>
+                                        <v-spacer />
+                                        <v-btn icon x-small @click="ui.showBuffers = !ui.showBuffers">
+                                            <v-icon small>
+                                                {{ ui.showBuffers ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
+                                            </v-icon>
+                                        </v-btn>
+                                    </div>
+
+                                    <v-expand-transition>
+                                        <div v-show="ui.showBuffers">
+                                            <v-simple-table dense>
+                                                <tbody>
+                                                    <tr v-for="(value, key) in detail.data.buffers"
+                                                        :key="`buffers-${key}`">
+                                                        <td class="tw-text-xs tw-font-medium">
+                                                            {{ key }}
+                                                        </td>
+                                                        <td class="tw-text-xs tw-font-mono">
+                                                            {{ value }}
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </v-simple-table>
+                                        </div>
+                                    </v-expand-transition>
+                                </div>
+                            </div>
+
+                            <v-divider v-if="hasCounts || hasBuffers" class="my-3" />
+
+                            <!-- 기본 정보 리스트 -->
                             <v-list dense>
                                 <v-list-item>
                                     <v-list-item-content>
@@ -138,7 +199,7 @@
                                             수정일 (updatedAt)
                                         </v-list-item-title>
                                         <v-list-item-subtitle>
-                                            {{ formatUpdatedAt(detail.data.updatedAt) }}
+                                            {{ detail.data.updatedAt }}
                                         </v-list-item-subtitle>
                                     </v-list-item-content>
                                 </v-list-item>
@@ -148,7 +209,8 @@
                                         <v-list-item-title class="font-weight-medium">
                                             사용 여부 (isActive)
                                         </v-list-item-title>
-                                        <v-list-item-subtitle>
+                                        <v-list-item-subtitle
+                                            :class="{ 'red--text text--darken-2': detail.data.isActive === false }">
                                             {{ detail.data.isActive }}
                                         </v-list-item-subtitle>
                                     </v-list-item-content>
@@ -159,7 +221,8 @@
                                         <v-list-item-title class="font-weight-medium">
                                             삭제일 (deletedAt)
                                         </v-list-item-title>
-                                        <v-list-item-subtitle>
+                                        <v-list-item-subtitle
+                                            :class="{ 'red--text text--darken-2': detail.data.isActive === false }">
                                             {{ detail.data.deletedAt }}
                                         </v-list-item-subtitle>
                                     </v-list-item-content>
@@ -191,6 +254,20 @@
                                     </v-list-item-content>
                                 </v-list-item>
                             </v-list>
+
+                            <v-divider />
+
+                            <!-- 활성/비활성 버튼 -->
+                            <div class="mt-4 d-flex justify-end">
+                                <v-btn small color="success" class="mr-2" :disabled="detail.data.isActive !== false"
+                                    @click="onEnable">
+                                    활성화
+                                </v-btn>
+
+                                <v-btn small color="error" :disabled="detail.data.isActive !== true" @click="onDisable">
+                                    비활성화
+                                </v-btn>
+                            </div>
                         </div>
                     </v-card-text>
                 </v-card>
@@ -200,30 +277,25 @@
 </template>
 
 <script>
-import { formatDate } from '@/utils/formatDate'
-
-/** 스냅샷 로그 API 엔드포인트(백엔드 라우트에 맞게 수정) */
 export default {
     name: 'AssetSnapshotLogPage',
 
     data() {
         return {
-            /** 전체 상태 */
             state: {
                 loading: false,
                 error: '',
-                raw: [] // API에서 받은 data 배열
+                raw: []
             },
-            /** 트리 상태 */
             tree: {
                 items: [],
                 open: [],
                 active: []
             },
-            /** 상세 패널 상태 */
             detail: {
                 error: '',
                 data: {
+                    _id: '',
                     assetId: '',
                     fileName: '',
                     version: '',
@@ -234,26 +306,34 @@ export default {
                     updatedAt: null,
                     isActive: true,
                     deletedAt: null,
+                    counts: {},
+                    buffers: {}
                 }
+            },
+            ui: {
+                showCounts: false,
+                showBuffers: false
             }
         }
     },
 
     computed: {
-        /**
-         * @computed hasActive
-         * @description 현재 트리에서 어떤 노드든 선택되어 있는지 여부
-         */
         hasActive() {
             return Array.isArray(this.tree.active) && this.tree.active.length > 0
         },
 
-        /**
-         * @computed hasActiveVersion
-         * @description 상세 패널에 보여줄 버전 노드가 선택되어 있는지 여부
-         */
         hasActiveVersion() {
             return !!(this.detail.data && this.detail.data.version)
+        },
+
+        hasCounts() {
+            const c = this.detail.data.counts
+            return c && typeof c === 'object' && Object.keys(c).length > 0
+        },
+
+        hasBuffers() {
+            const b = this.detail.data.buffers
+            return b && typeof b === 'object' && Object.keys(b).length > 0
         }
     },
 
@@ -262,10 +342,6 @@ export default {
     },
 
     methods: {
-        /**
-         * @function reload
-         * @description 스냅샷 로그를 다시 불러와 트리 구조로 변환한다.
-         */
         async reload() {
             this.state.loading = true
             this.state.error = ''
@@ -274,6 +350,7 @@ export default {
             this.tree.active = []
             this.detail.error = ''
             this.detail.data = {
+                _id: '',
                 assetId: '',
                 fileName: '',
                 version: '',
@@ -284,7 +361,11 @@ export default {
                 updatedAt: null,
                 isActive: true,
                 deletedAt: null,
+                counts: {},
+                buffers: {}
             }
+            this.ui.showCounts = false
+            this.ui.showBuffers = false
 
             const ok = await this.$err.guard(
                 async () => {
@@ -309,36 +390,27 @@ export default {
             this.state.loading = false
         },
 
-        /**
-         * @function buildSnapshotTree
-         * @description 스냅샷 로그 배열을 v-treeview용 트리 데이터로 변환한다.
-         *              - 루트: 파일 단위(asset)
-         *              - 자식: 각 버전(files 배열의 원소)
-         * @param {Array<Object>} rows - API에서 받은 data 배열
-         * @returns {Array<Object>} v-treeview items
-         */
         buildSnapshotTree(rows = []) {
             return rows.map((asset, assetIndex) => {
                 const assetId = asset.assetId || asset._id || `asset-${assetIndex}`
                 const fileName = asset.fileName || '(no name)'
                 const files = Array.isArray(asset.files) ? asset.files : []
 
-                // 🔹 루트(파일) 노드의 활성 여부: 있으면 그대로, 없으면 children 기준으로 유추
                 const assetIsActive =
-                asset.isActive ?
-                asset.isActivate :
-                files.some(f => (f.isActive ? f.isActivate : true) === true)
+                    asset.isActive
+                        ? asset.isActivate
+                        : files.some(f => (f.isActive ? f.isActivate : true) === true)
 
                 return {
                     id: assetId,
                     type: 'asset',
                     assetId,
                     fileName,
-                    // 🔹 루트에도 isActive 플래그 달아두기
                     isActive: assetIsActive,
                     children: files.map((file, i) => ({
                         id: `${assetId}:${file.version || i}`,
                         type: 'version',
+                        _id: file._id || null,
                         assetId,
                         fileName,
                         version: file.version || '',
@@ -347,21 +419,15 @@ export default {
                         url: file.url || '',
                         thumbnail: file.thumbnail || '',
                         updatedAt: file.updatedAt || null,
-                        // 🔹 isActive / isActivate 둘 다 케어
                         isActive: file.isActive,
-                        deletedAt: file.deletedAt || null
+                        deletedAt: file.deletedAt || null,
+                        counts: file.counts || {},
+                        buffers: file.buffers || {}
                     }))
                 }
             })
         },
 
-        /**
-         * @function findNodeById
-         * @description 트리에서 id로 노드를 찾는다(BFS).
-         *              공통코드 페이지의 findTreeNodeById 패턴을 재사용.
-         * @param {string} id - 찾을 노드 id
-         * @returns {Object|null} 찾은 노드 또는 null
-         */
         findNodeById(id) {
             const queue = [...this.tree.items]
             while (queue.length) {
@@ -374,15 +440,10 @@ export default {
             return null
         },
 
-        /**
-         * @function onActiveChange
-         * @description 트리의 활성 노드가 변경되었을 때 호출된다.
-         *              - 버전 노드(type === 'version')를 선택하면 우측 상세를 갱신한다.
-         * @param {Array<string>} activeIds - 활성 노드 id 배열
-         */
         onActiveChange(activeIds) {
             if (!Array.isArray(activeIds) || activeIds.length === 0) {
                 this.detail.data = {
+                    _id: '',
                     assetId: '',
                     fileName: '',
                     version: '',
@@ -392,8 +453,12 @@ export default {
                     thumbnail: '',
                     updatedAt: null,
                     isActive: true,
-                    deletedAt: null
+                    deletedAt: null,
+                    counts: {},
+                    buffers: {}
                 }
+                this.ui.showCounts = false
+                this.ui.showBuffers = false
                 return
             }
 
@@ -401,11 +466,13 @@ export default {
             const node = this.findNodeById(id)
             if (!node) return
 
-            console.log(node);
+            // 새 노드 선택시 토글 상태 초기화
+            this.ui.showCounts = false
+            this.ui.showBuffers = false
 
-            // 버전 노드만 상세에 반영
             if (node.type === 'version') {
                 this.detail.data = {
+                    _id: node._id || '',
                     assetId: node.assetId || '',
                     fileName: node.fileName || '',
                     version: node.version || '',
@@ -415,35 +482,91 @@ export default {
                     thumbnail: node.thumbnail || '',
                     updatedAt: node.updatedAt || null,
                     isActive: node.isActive,
-                    deletedAt: node.deletedAt || 'null'
+                    deletedAt: node.deletedAt || null,
+                    counts: node.counts || {},
+                    buffers: node.buffers || {}
                 }
             }
         },
 
-        /**
-         * @function formatBytes
-         * @description 바이트 수를 사람이 읽기 쉬운 단위(예: 1.23 MB)로 변환한다.
-         * @param {number} n - 바이트 수
-         * @returns {string} 포맷팅된 문자열
-         */
         formatBytes(n) {
             const bytes = Number(n) || 0
-            if (bytes < 1024) return `${bytes} B`
+            if (bytes < 1024) {
+                return `${bytes} B`
+            }
+
             const kb = bytes / 1024
-            if (kb < 1024) return `${kb.toFixed(1)} KB`
+            if (kb < 1024) {
+                `${kb.toFixed(1)} KB`
+            }
             const mb = kb / 1024
+
             return `${mb.toFixed(2)} MB`
         },
 
-        /**
-         * @function formatUpdatedAt
-         * @description updatedAt ISO 문자열을 공통 포맷 함수로 보기 좋게 변환한다.
-         * @param {string|null} v - ISO 날짜 문자열
-         * @returns {string} 포맷팅된 날짜 문자열
-         */
-        formatUpdatedAt(v) {
-            if (!v) return ''
-            return formatDate(v)
+        async onEnable() {
+            if (!this.detail.data || !this.detail.data.version) {
+                return
+            }
+
+            const body = {
+                _id: this.detail.data._id,
+                assetId: this.detail.data.assetId,
+                fileName: this.detail.data.fileName,
+                version: this.detail.data.version
+            }
+
+            const { ok } = await this.$err.guard(
+                async () => {
+                    await this.$api.put('/assets/activate', body)
+                    return true
+                },
+                {
+                    context: {
+                        where: 'AssetSnapshotLogPage.onDisable',
+                        assetId: this.detail.data.assetId,
+                        fileName: this.detail.data.fileName,
+                        version: this.detail.data.version
+                    }
+                }
+            )
+
+            if (ok) {
+                reload()
+            }
+
+        },
+
+        async onDisable() {
+            if (!this.detail.data || !this.detail.data.version) {
+                return
+            }
+
+            const body = {
+                _id: this.detail.data._id,
+                assetId: this.detail.data.assetId,
+                fileName: this.detail.data.fileName,
+                version: this.detail.data.version
+            }
+
+            const { ok } = await this.$err.guard(
+                async () => {
+                    await this.$api.put('/assets/delete', body)
+                    return true
+                },
+                {
+                    context: {
+                        where: 'AssetSnapshotLogPage.onDisable',
+                        assetId: this.detail.data.assetId,
+                        fileName: this.detail.data.fileName,
+                        version: this.detail.data.version
+                    }
+                }
+            )
+
+            if (ok) {
+                reload()
+            }
         }
     }
 }

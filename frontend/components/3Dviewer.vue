@@ -92,7 +92,7 @@ export default {
 
             // ----- Scene / Camera / Renderer -----
             const scene = new THREE.Scene()
-            scene.background = new THREE.Color(0x1f1f1f)
+            scene.background = new THREE.Color(0x2f2f2f)
 
             const camera = new THREE.PerspectiveCamera(
                 60,

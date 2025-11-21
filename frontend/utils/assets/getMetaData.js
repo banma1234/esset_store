@@ -49,15 +49,75 @@ function isEmbeddedGltfJSON(gltf) {
 }
 
 /**
+ * @function computeGltfCounts
+ * @description 메쉬 카운트 등 집계
+ * @param {Object} gltf - 파싱된 glTF JSON
+ * @returns {Object} counts 객체
+
+ */
+function computeGltfCounts(gltf) {
+  const len = (v) => (Array.isArray(v) ? v.length : 0);
+
+  // primitives 개수 합산
+  let primCount = 0;
+  if (Array.isArray(gltf.meshes)) {
+    for (const m of gltf.meshes) {
+      if (Array.isArray(m.primitives)) {
+        primCount += m.primitives.length;
+      }
+    }
+  }
+
+  const scenesCount = len(gltf.scenes);
+  const hasSceneIndex = typeof gltf.scene === "number";
+
+  return {
+    scene: scenesCount || (hasSceneIndex ? 1 : 0),
+    scenes: scenesCount,
+    nodes: len(gltf.nodes),
+    meshes: len(gltf.meshes),
+    materials: len(gltf.materials),
+    skins: len(gltf.skins),
+    textures: len(gltf.textures),
+    accessors: len(gltf.accessors),
+    prims: primCount,
+  };
+}
+
+/**
+ * @function computeBufferStats
+ * @description 버퍼 카운트 집계
+ * @param {Object} gltf - 파싱된 glTF JSON
+ * @returns {{buffers:number, bufferViews:number, totalBytes:number}}
+ */
+function computeBufferStats(gltf) {
+  const buffersArr = Array.isArray(gltf.buffers) ? gltf.buffers : [];
+  const bufferViewsArr = Array.isArray(gltf.bufferViews)
+    ? gltf.bufferViews
+    : [];
+
+  let totalBytes = 0;
+  for (const b of buffersArr) {
+    const len = typeof b?.byteLength === "number" ? b.byteLength : 0;
+    totalBytes += len;
+  }
+
+  return {
+    buffers: buffersArr.length,
+    bufferViews: bufferViewsArr.length,
+    totalBytes,
+  };
+}
+
+/**
  * @function mergeGltfExtrasForEsset
- * @description .gltf의 루트 extras에서 esMeta/esUserData/esThumb를 읽고,
- *              selection(category/filters)을 반영해 userMeta를 생성한다.
- *              - version: extras.esMeta.version을 읽어 bump 후 덮어쓰기
- *              - uploadedAt 등 시간 필드는 클라이언트에서 무시(세팅/변경 안 함)
- *              - esThumb는 서버 담당: 있으면 보존, 없으면 생성하지 않음
- * @param {File} gltfFile - .gltf(Embedded)
+ * @description 집계한 메타데이터들 병합
  * @param {MergeSelection} selection
- * @returns {Promise<Object>} userMeta  // upload3DModel의 userMeta로 그대로 전달
+ * @returns {Promise<{
+ *   extras: Object,
+ *   counts: Object,
+ *   buffers: {buffers:number, bufferViews:number, totalBytes:number}
+ * }>} userMeta
  */
 export async function mergeGltfExtrasForEsset(gltfFile, selection) {
   if (!gltfFile)
@@ -83,6 +143,7 @@ export async function mergeGltfExtrasForEsset(gltfFile, selection) {
 
   // 4) esMeta 보장 + version bump (uploadedAt은 무시)
   if (!extras.esMeta || typeof extras.esMeta !== "object") extras.esMeta = {};
+
   const prevVer =
     typeof extras.esMeta.version === "string"
       ? extras.esMeta.version.trim()
@@ -96,7 +157,10 @@ export async function mergeGltfExtrasForEsset(gltfFile, selection) {
     }
   }
   extras.esMeta.version = nextVersion;
-  // extras.esMeta.uploadedAt: 클라이언트에서 세팅/수정하지 않음(무시)
+
+  // 4-1) glTF 구조 counts / buffers 요약 계산
+  const counts = computeGltfCounts(gltf);
+  const buffers = computeBufferStats(gltf);
 
   // 5) esUserData 보장 + 선택값 반영
   if (!extras.esUserData || typeof extras.esUserData !== "object")
@@ -118,21 +182,21 @@ export async function mergeGltfExtrasForEsset(gltfFile, selection) {
   userData.category = categoryCode;
   userData.filters = filterCodes;
 
-  // 6) esThumb는 서버 책임 → 존재 시 그대로 보존, 없으면 생성하지 않음
-  // if (!extras.esThumb) { /* do nothing */ }
-
-  // 7) 최종 userMeta(서버 커밋 바디에 실릴 객체)
-  //    필요하면 서버에서 extras.esMeta.uploadedAt/썸네일 생성 후 갱신
   return {
     extras: {
-      esMeta: { version: extras.esMeta.version }, // uploadedAt은 명시적으로 싣지 않음(서버에서 처리)
+      esMeta: {
+        version: extras.esMeta.version,
+      },
       esUserData: {
         rigs: userData.rigs,
         links: userData.links,
         category: userData.category,
         filters: userData.filters,
       },
-      // esThumb는 있으면 포함하고, 없으면 생략
+      esStats: {
+        counts,
+        buffers,
+      },
       ...(extras.esThumb ? { esThumb: extras.esThumb } : {}),
     },
   };
