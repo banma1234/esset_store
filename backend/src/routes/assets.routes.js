@@ -3,7 +3,8 @@ const {
   getAssetsBySearchOptions,
   getAssetByFileName,
   downloadAssetFromDB,
-  deactivateAssetById
+  deactivateAssetById,
+  activateAssetById,
 } = require('../services/assets/assets.service');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { AppError } = require('../errors/appError');
@@ -80,12 +81,26 @@ async function assetDownloadAPI(req, res) {
 async function assetDeactivateAPI(req, res) {
   await deactivateAssetById(req.body);
 
-  return res.status(200).json({ok: true});
+  return res.status(200).json({ ok: true });
+}
+
+/**
+ * @function assetActivateAPI
+ * @description 에셋 활성화 API.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+async function assetActivateAPI(req, res) {
+  console.log(req.body);
+  await activateAssetById(req.body);
+
+  return res.status(200).json({ ok: true });
 }
 
 router.get('/api/v1/assets/search', asyncHandler(assetsSearchAPI));
 router.get('/api/v1/assets', asyncHandler(assetViewerAPI));
 router.get('/api/v1/assets/download', asyncHandler(assetDownloadAPI));
 router.put('/api/v1/assets/delete', asyncHandler(assetDeactivateAPI));
+router.put('/api/v1/assets/activate', asyncHandler(assetActivateAPI));
 
 module.exports = router;

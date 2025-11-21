@@ -41,6 +41,8 @@ const { AppError } = require('../errors/appError');
  * @property {string} [thumbnail] 썸네일 CDN URL
  * @property {Object} category 카테고리 정보 객체
  * @property {Object[]} filters 필터 정보 배열
+ * @property {Object} counts 메쉬 카운트
+ * @property {Object} buffers 버퍼 카운트
  * @property {LatestVersionInfo} latestVersion 최신 버전 정보
  */
 
@@ -81,7 +83,6 @@ async function writeAssetSnapshot(payload) {
   let assetDoc;
   let isAssetCreate = false;
 
-  // 1) 에셋 찾기 또는 생성
   try {
     assetDoc = await Asset.findOne({ fileName: payload.fileName });
 
@@ -106,7 +107,6 @@ async function writeAssetSnapshot(payload) {
     throw new AppError('에셋 저장 중 오류가 발생했습니다.', 500, err);
   }
 
-  // 2) assetVersions 스냅샷 저장
   const { latestVersion, ...rest } = payload;
 
   const snapshotPayload = {
@@ -219,6 +219,7 @@ async function getAssetVersionGroups(opts = {}) {
       fileName: { $first: '$fileName' }, // ← assetVersions.fileName 사용
       files: {
         $push: {
+          _id: '$_id',
           version: '$version',
           fileType: '$fileType',
           sizeBytes: '$sizeBytes',
@@ -226,7 +227,9 @@ async function getAssetVersionGroups(opts = {}) {
           thumbnail: '$thumbnail',
           updatedAt: '$updatedAt',
           isActive: '$isActive',
-          deletedAt: '$deletedAt'
+          deletedAt: '$deletedAt',
+          counts: '$counts',
+          buffers: '$buffers',
         },
       },
     },
@@ -276,9 +279,6 @@ async function getAssetVersionGroups(opts = {}) {
 async function searchAssetEvents(options = {}) {
   const { eventType, startDate, endDate, page, pageSize } = options;
 
-  // ==========================
-  // 1) 페이지네이션 파라미터 처리
-  // ==========================
   const DEFAULT_PAGE_SIZE = 20;
   const MAX_PAGE_SIZE = 100;
 
@@ -297,9 +297,6 @@ async function searchAssetEvents(options = {}) {
 
   const skip = (pageNum - 1) * limit;
 
-  // ==========================
-  // 2) 검색 조건(query) 구성
-  // ==========================
   /** @type {Record<string, any>} */
   const query = {};
 
@@ -329,9 +326,6 @@ async function searchAssetEvents(options = {}) {
     query.updatedAt = dateCond;
   }
 
-  // ==========================
-  // 3) 조회 + 전체 개수 계산
-  // ==========================
   const [items, totalItems] = await Promise.all([
     AssetEvent.find(query)
       .sort({ updatedAt: -1 }) // 최신 이벤트 먼저

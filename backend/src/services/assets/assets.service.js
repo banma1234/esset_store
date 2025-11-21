@@ -146,10 +146,13 @@ async function saveSafeModel(payload) {
       thumbnail: `${CDN_BASE_URL}${thumbKey.replace(S3_ENDPOINT, '')}`,
       category: userMeta.esUserData.category,
       filters: userMeta.esUserData.filters,
+      counts: userMeta.esStats.counts,
+      buffers: userMeta.esStats.buffers,
       latestVersion: {
         version: userMeta.version,
         url: `${CDN_BASE_URL}${key.replace(S3_ENDPOINT, '')}`,
       },
+      // counts, buffers 주입
     },
   });
 
@@ -308,59 +311,160 @@ async function downloadAssetFromDB(query, mode) {
   }
 }
 
+/**
+ * @function deactivateAssetById
+ * @description 특정 에셋 버전 비활성화(.
+ * @param {{ _id: string, assetId: string, fileName?: string, version: string }} body
+ * @returns {Promise<void>}
+ */
 async function deactivateAssetById(body) {
   const { _id, assetId, fileName, version } = body;
   const now = new Date();
-  
+
   try {
     await AssetVersions.updateOne({ _id: new ObjectId(_id) }, { isActive: false, deletedAt: now });
-    const assetOrigin = await Asset.findOne({ _id: new ObjectId(assetId) }).lean();
 
-    console.log(assetOrigin)
-    console.log("==================")
+    const assetOrigin = await Asset.findById(assetId).lean();
 
-    if (assetOrigin.latestVersion.version === version) {
-      const restVersions = await AssetVersions.find({ assetId: new ObjectId(assetId), isActive: true }.sort({ version: 1 })).lean();
+    if (!assetOrigin) {
+      throw new AppError('해당 에셋을 찾을 수 없습니다.', 404, 'ASSET_NOT_FOUND');
+    }
 
-      console.log(restVersions);
-      console.log("==================")
+    const isLatestTarget = assetOrigin.latestVersion && assetOrigin.latestVersion.version === version;
+    if (isLatestTarget) {
+      const nextLatest = await AssetVersions.findOne({
+        assetId,
+        isActive: true,
+      })
+        .sort({ version: -1 })
+        .lean();
 
-      if (restVersions.length > 0) {
-        const latestVersion = { version: restVersions[0].version, url: restVersions[0].url };
+      if (nextLatest) {
+        // 이전 버전이 있는 경우 버전 갱신.
+        await Asset.updateOne(
+          { _id: new ObjectId(assetId) },
+          {
+            latestVersion: {
+              version: nextLatest.version,
+              url: nextLatest.url,
+            },
+            thumbnail: nextLatest.thumbnail,
+            sizeBytes: nextLatest.sizeBytes,
+            updatedAt: now,
+            isActive: true,
+            deletedAt: null,
+          },
+        );
 
-        console.log(latestVersion);
-        console.log("==================")
-
-        await Asset.updateOne({ _id: new ObjectId(assetId) }, { latestVersion: latestVersion, thumbnail: restVersions[0].thumbnail, sizeBytes: restVersions[0].sizeBytes, updatedAt: now })
-
+        // 최신 버전 갱신 UPDATE 이벤트 기록.
         handleLogEvent({
           type: 'ASSET_EVENT',
           payload: {
             eventType: 'UPDATE',
-            assetId: assetId,
+            assetId,
             assetVersionsId: _id,
-            fileName: fileName,
-            version: latestVersion.version
-        },
-      });
+            fileName,
+            version: nextLatest.version,
+          },
+        });
       } else {
-        await Asset.updateOne({ _id: new ObjectId(assetId) }, { isActive: false, deletedAt: now })
+        // 남은 versions 없으면 Asset 비활성화.
+        await Asset.updateOne(
+          { _id: new ObjectId(assetId) },
+          {
+            isActive: false,
+            deletedAt: now,
+            latestVersion: undefined,
+            thumbnail: undefined,
+            sizeBytes: undefined,
+            updatedAt: now,
+          },
+        );
       }
     }
 
-      handleLogEvent({
-        type: 'ASSET_EVENT',
-        payload: {
-          eventType: 'DELETE',
-          assetId: assetId,
-          assetVersionsId: _id,
-          fileName: fileName,
-          version: version
-        },
-      });
+    handleLogEvent({
+      type: 'ASSET_EVENT',
+      payload: {
+        eventType: 'DELETE',
+        assetId,
+        assetVersionsId: _id,
+        fileName,
+        version,
+      },
+    });
   } catch (err) {
-    throw new AppError('에셋 비활성화에 실패했습니다.', 422, 'FAILED_ASSET_DEACTIVATE')
+    throw new AppError('에셋 비활성화에 실패했습니다.', 422, 'FAILED_ASSET_DEACTIVATE');
   }
+}
+
+/**
+ * @function activateAssetById
+ * @description 활성화
+ * @param {{ _id: string, assetId: string, fileName?: string, version: string }} body
+ * @returns {Promise<void>}
+ */
+async function activateAssetById(body) {
+  const { _id, assetId, fileName, version } = body;
+  const now = new Date();
+
+  console.log(fileName);
+
+  // 3) 현재 “활성” 중 최댓값 버전 조회(본인 포함 가능)
+  const nextLatest = await AssetVersions.findOne({
+    assetId: assetId,
+    isActive: true,
+    deletedAt: null,
+  })
+    .sort({ version: -1 }) // 가장 큰 버전
+    .lean();
+
+  console.log(nextLatest);
+  console.log('==================');
+
+  // 1) 활성화 대상 버전 로드
+  const verDoc = await AssetVersions.findById(_id).lean();
+  if (!verDoc) throw new AppError('활성화 대상 버전을 찾을 수 없습니다.', 404, 'ASSET_VERSION_NOT_FOUND');
+  if (String(verDoc.assetId) !== String(assetId)) {
+    throw new AppError('assetId와 버전의 소유가 일치하지 않습니다.', 409, 'ASSET_MISMATCH');
+  }
+
+  console.log(verDoc);
+
+  // 2) 대상 버전 활성화
+  await AssetVersions.updateOne({ _id: verDoc._id }, { $set: { isActive: true, deletedAt: null } });
+
+  // 4) 요청하신 단순 비교: nextLatest.version < verDoc.version 인 경우만 승격
+  //    (nextLatest가 없으면 -Infinity 취급)
+  const base = nextLatest?.version ?? -Infinity;
+
+  console.log(base);
+
+  if (base < verDoc.version) {
+    await Asset.updateOne(
+      { _id: verDoc.assetId },
+      {
+        $set: {
+          latestVersion: { url: verDoc.url, version: verDoc.version },
+          thumbnail: verDoc.thumbnail,
+          updatedAt: now,
+          isActive: true,
+          deletedAt: null,
+        },
+      },
+    );
+  }
+
+  handleLogEvent({
+    type: 'ASSET_EVENT',
+    payload: {
+      eventType: 'UPDATE',
+      assetId: assetId,
+      assetVersionsId: _id,
+      fileName: fileName,
+      version: version,
+    },
+  });
 }
 
 module.exports = {
@@ -372,5 +476,6 @@ module.exports = {
   getAssetByFileName,
   getAssetsBySearchOptions,
   downloadAssetFromDB,
-  deactivateAssetById
+  deactivateAssetById,
+  activateAssetById,
 };
