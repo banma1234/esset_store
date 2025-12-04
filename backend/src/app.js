@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const yaml = require('js-yaml');
+const swaggerUi = require('swagger-ui-express');
 const { mongoHealth } = require('./config/mongo');
 
 const commonCodeRoutes = require('./routes/commonCode.routes');
@@ -39,6 +41,28 @@ app.get('/health', (req, res) => {
 app.get('/api/v1/test', (req, res) => {
   res.json({ message: 'test successful' });
 });
+
+// 1) openapi.yaml 읽기
+const openapiPath = path.join(__dirname, '..', 'openapi.yaml'); // backend/openapi.yaml
+let openapiDocument = {};
+
+try {
+  const fileContents = fs.readFileSync(openapiPath, 'utf8');
+  openapiDocument = yaml.load(fileContents);
+} catch (err) {
+  console.error('❌ openapi.yaml 로드 실패:', err.message);
+  openapiDocument = {
+    openapi: '3.0.0',
+    info: {
+      title: 'Temporary API Docs',
+      version: '0.0.0',
+      description: 'openapi.yaml 을 로드하는 데 실패했습니다.',
+    },
+  };
+}
+
+// 2) Swagger UI 미들웨어 연결
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiDocument));
 
 app.use(requestContext());
 app.use(requestLogger());
