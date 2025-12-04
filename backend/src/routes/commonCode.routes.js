@@ -17,6 +17,53 @@ const router = express.Router();
  * @returns {import('express').RequestHandler}
  */
 
+// /**
+//  * @function commonCodeHandler
+//  * @description 하나의 핸들러에서 GET/POST를 분기하여 각 서비스 호출
+//  * @param {import('express').Request} req
+//  * @param {import('express').Response} res
+//  * @param {import('express').NextFunction} next
+//  */
+// async function commonCodeHandler(req, res, next) {
+//   try {
+//     // GET: 전체 또는 단일
+//     if (req.method === 'GET') {
+//       const code = typeof req.query.code === 'string' ? req.query.code.trim() : '';
+
+//       if (code) {
+//         const target = await getCommonCodeByCode(code);
+//         if (!target) {
+//           return res.status(404).json({ ok: false, message: 'commonCode not target' });
+//         }
+
+//         return res.status(200).json({ ok: true, data: target });
+//       }
+//       const items = await getAllCommonCodes();
+
+//       return res.status(200).json({ ok: true, data: items });
+//     }
+
+//     // POST: 생성
+//     if (req.method === 'POST') {
+//       await saveCommonCode(req.body);
+
+//       return res.status(201).json({ ok: true });
+//     }
+
+//     // PUT : 수정
+//     if (req.method === 'PUT') {
+//       await updateCommonCode(req.body);
+
+//       return res.status(201).json({ ok: true });
+//     }
+
+//     // 허용되지 않은 메서드
+//     return res.status(405).json({ ok: false, message: 'Method Not Allowed' });
+//   } catch (err) {
+//     next(err);
+//   }
+// }
+
 /**
  * @function commonCodeHandler
  * @description 하나의 핸들러에서 GET/POST를 분기하여 각 서비스 호출

@@ -43,15 +43,18 @@ app.get('/api/v1/test', (req, res) => {
 });
 
 // 1) openapi.yaml 읽기
-const openapiPath = path.join(__dirname, '..', 'openapi.yaml'); // backend/openapi.yaml
+// __dirname === backend/src 기준
+// backend/src/openapi.yaml 을 읽으려면 '..' 없이 바로 openapi.yaml
+const openapiPath = path.join(__dirname, 'openapi.yaml');
+
 let openapiDocument = {};
 
 try {
   const fileContents = fs.readFileSync(openapiPath, 'utf8');
   openapiDocument = yaml.load(fileContents);
-  console.log('swagger-ui');
+  console.log('✅ swagger-ui: openapi.yaml loaded from', openapiPath);
 } catch (err) {
-  console.error('❌ openapi.yaml 로드 실패:', err.message);
+  console.error('❌ openapi.yaml 로드 실패:', err.message, '경로:', openapiPath);
   openapiDocument = {
     openapi: '3.0.0',
     info: {
