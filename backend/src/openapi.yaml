@@ -1,0 +1,154 @@
+openapi: 3.0.3
+info:
+  title: Common Code API
+  version: 1.0.0
+paths:
+  /api/v1/commonCode:
+    get:
+      summary: Get all common codes or a common code by code
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The common code to retrieve
+      responses:
+        '200':
+          description: Successful response with common code(s)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CommonCodeResponse'
+                  - $ref: '#/components/schemas/CommonCodesResponse'
+        '404':
+          description: Common code not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create a new common code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeCreateRequest'
+      responses:
+        '201':
+          description: Common code created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    put:
+      summary: Update an existing common code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeUpdateRequest'
+      responses:
+        '201':
+          description: Common code updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    default:
+      description: Method Not Allowed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    CommonCode:
+      type: object
+      properties:
+        code:
+          type: string
+          description: The unique common code identifier
+        description:
+          type: string
+          description: Description of the common code
+      required:
+        - code
+        - description
+      additionalProperties: false
+    CommonCodeCreateRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          description: The unique common code identifier
+        description:
+          type: string
+          description: Description of the common code
+      required:
+        - code
+        - description
+      additionalProperties: false
+    CommonCodeUpdateRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          description: The unique common code identifier, to identify which to update
+        description:
+          type: string
+          description: New description of the common code
+      required:
+        - code
+        - description
+      additionalProperties: false
+    CommonCodeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/CommonCode'
+      required:
+        - ok
+        - data
+      additionalProperties: false
+    CommonCodesResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCode'
+      required:
+        - ok
+        - data
+      additionalProperties: false
+    SuccessResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+      required:
+        - ok
+      additionalProperties: false
+    ErrorResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: false
+        message:
+          type: string
+      required:
+        - ok
+        - message
+      additionalProperties: false
