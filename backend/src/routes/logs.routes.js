@@ -58,7 +58,7 @@ async function test(req, res) {
   return res.status(200).json({ ok: true, message: 'wow' });
 }
 
-// test
+// test damn
 router.get('/api/vi/test/wow', test);
 
 module.exports = router;
