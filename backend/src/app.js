@@ -3,6 +3,8 @@ const cors = require('cors');
 const morgan = require('morgan');
 const yaml = require('js-yaml');
 const swaggerUi = require('swagger-ui-express');
+const path = require('path');
+const fs = require('fs');
 const { mongoHealth } = require('./config/mongo');
 
 const commonCodeRoutes = require('./routes/commonCode.routes');

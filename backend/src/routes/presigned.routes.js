@@ -1,7 +1,7 @@
 const express = require('express');
 const { issuePresignedPut, issuePresignedGet } = require('../services/assets/presigned.service');
 const { asyncHandler } = require('../utils/asyncHandler');
-const { AppError } = require('../../errors/appError');
+const { AppError } = require('../errors/appError');
 
 const router = express.Router();
 
