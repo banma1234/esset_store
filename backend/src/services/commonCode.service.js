@@ -13,6 +13,17 @@ async function loadParentFor(parentId) {
   return CommonCode.findOne({ _id: new ObjectId(parentId), isActive: true }).lean();
 }
 
+// /**
+//  * @function computeDepth
+//  * @description 부모를 기준으로 depth 값을 계산한다.
+//  * @param {object|null} parent 부모 문서(lean) 또는 null
+//  * @returns {number} 계산된 depth (루트=0)
+//  */
+// function computeDepth(parent) {
+//   if (!parent) return 0;
+//   const pDepth = typeof parent.depth === 'number' ? parent.depth : 0;
+//   return pDepth + 1;
+// }
 /**
  * @function computeDepth
  * @description 부모를 기준으로 depth 값을 계산한다.
