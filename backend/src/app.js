@@ -49,6 +49,7 @@ let openapiDocument = {};
 try {
   const fileContents = fs.readFileSync(openapiPath, 'utf8');
   openapiDocument = yaml.load(fileContents);
+  console.log('swagger-ui');
 } catch (err) {
   console.error('❌ openapi.yaml 로드 실패:', err.message);
   openapiDocument = {
