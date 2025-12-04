@@ -54,4 +54,11 @@ router.post('/api/v1/_debug/log', asyncHandler(logRouter));
 router.get('/api/v1/_debug/log/assetversions', asyncHandler(getAssetSnapshots));
 router.get('/api/v1/_debug/log/assetevents', asyncHandler(getAssetEvents));
 
+async function test(req, res) {
+  return res.status(200).json({ ok: true, message: 'wow' });
+}
+
+// test
+router.get('/api/vi/test/wow', test);
+
 module.exports = router;
