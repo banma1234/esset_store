@@ -2,6 +2,161 @@ openapi: 3.0.3
 info:
   title: API
   version: 1.0.0
-paths: {}
+paths:
+  /api/v1/commonCode:
+    get:
+      summary: 공통 코드 조회
+      description: |
+        - query parameter `code`가 있으면 단일 commonCode 조회
+        - 없으면 전체 commonCode 리스트 조회
+      parameters:
+        - name: code
+          in: query
+          description: 조회할 commonCode의 코드
+          required: false
+          schema:
+            type: string
+      responses:
+        '202':
+          description: 공통 코드 조회 성공
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CommonCodeResponse'
+                  - $ref: '#/components/schemas/CommonCodeListResponse'
+        '404':
+          description: 조회 대상 commonCode 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: 공통 코드 생성
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeCreateRequest'
+      responses:
+        '202':
+          description: 공통 코드 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseResponse'
+    put:
+      summary: 공통 코드 수정
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommonCodeUpdateRequest'
+      responses:
+        '202':
+          description: 공통 코드 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseResponse'
 components:
-  schemas: {}
+  schemas:
+    CommonCode:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 공통 코드의 고유 코드
+        name:
+          type: string
+          description: 공통 코드명
+        description:
+          type: string
+          description: 공통 코드에 대한 상세 설명
+      required:
+        - code
+        - name
+        - description
+      additionalProperties: false
+    CommonCodeCreateRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 생성할 공통 코드의 고유 코드
+        name:
+          type: string
+          description: 생성할 공통 코드명
+        description:
+          type: string
+          description: 생성할 공통 코드 상세 설명
+      required:
+        - code
+        - name
+        - description
+      additionalProperties: false
+    CommonCodeUpdateRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 수정할 공통 코드의 고유 코드 (필수, 식별자)
+        name:
+          type: string
+          description: 수정할 공통 코드명
+        description:
+          type: string
+          description: 수정할 공통 코드 상세 설명
+      required:
+        - code
+      additionalProperties: false
+    CommonCodeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/CommonCode'
+      required:
+        - ok
+        - data
+      additionalProperties: false
+    CommonCodeListResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonCode'
+      required:
+        - ok
+        - data
+      additionalProperties: false
+    BaseResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+      required:
+        - ok
+      additionalProperties: false
+    ErrorResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: commonCode not target
+      required:
+        - ok
+        - message
+      additionalProperties: false
