@@ -28,25 +28,25 @@ async function commonCodeHandler(req, res, next) {
           return res.status(404).json({ ok: false, message: 'commonCode not target' });
         }
 
-        return res.status(200).json({ ok: true, data: target });
+        return res.status(202).json({ ok: true, data: target });
       }
       const items = await getAllCommonCodes();
 
-      return res.status(200).json({ ok: true, data: items });
+      return res.status(202).json({ ok: true, data: items });
     }
 
     // POST: 생성
     if (req.method === 'POST') {
       await saveCommonCode(req.body);
 
-      return res.status(200).json({ ok: true });
+      return res.status(202).json({ ok: true });
     }
 
     // PUT : 수정
     if (req.method === 'PUT') {
       await updateCommonCode(req.body);
 
-      return res.status(200).json({ ok: true });
+      return res.status(202).json({ ok: true });
     }
 
     // 허용되지 않은 메서드
