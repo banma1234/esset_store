@@ -58,12 +58,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
-    default:
+    all:
+      summary: Method Not Allowed
       description: Method Not Allowed
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
+      responses:
+        '405':
+          description: Method Not Allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/assets/search:
     get:
       summary: 에셋 검색 (카테고리 + 필터 + 페이지네이션)
